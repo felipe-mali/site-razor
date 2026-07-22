@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0A0A0A">
+  <title>Chaves Pagamento - Razor Industria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="panel-page">
+  <header id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">
+        <img src="fotos/logo.jpg" alt="Razor Industria" class="logo">
+      </a>
+      <nav>
+        <a href="index.html">Inicio</a>
+        <a href="funcionario.html">Painel</a>
+        <a href="permissoes.html">Permissoes</a>
+        <a href="chaves-pagamento.html" class="active">Chaves Pagamento</a>
+        <a href="#" id="btn-sair" class="btn btn-ghost btn-sm">Sair</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="nav-overlay"></div>
+  </header>
+
+  <div class="panel-header">
+    <div class="container">
+      <h1>Gerenciar <span>Chaves Pagamento</span></h1>
+    </div>
+  </div>
+
+  <main class="container permissoes-page">
+    <div class="perm-header">
+      <input type="text" id="busca" placeholder="Buscar por nome..." class="input-busca">
+      <button class="btn" onclick="abrirModal()">+ Novo Funcionario</button>
+    </div>
+
+    <div class="table-wrapper">
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Funcionario</th>
+              <th>Tipo</th>
+              <th>Chave PIX</th>
+              <th>Acoes</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-chaves"></tbody>
+        </table>
+      </div>
+      <p id="msg-vazio" style="display:none;text-align:center;padding:32px;color:var(--text-secondary);">Nenhum funcionario cadastrado.</p>
+    </div>
+  </main>
+
+  <!-- Modal Cadastro/Edicao -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <h2 id="modal-title">Novo Funcionario</h2>
+      <form id="chave-form">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label for="input-funcionario">Nome do Funcionario *</label>
+          <input type="text" id="input-funcionario" required placeholder="Nome completo">
+        </div>
+        <div class="form-group">
+          <label for="input-apelido">Apelido</label>
+          <input type="text" id="input-apelido" placeholder="Apelido (opcional)">
+        </div>
+        <div class="form-group">
+          <label for="input-tipo">Tipo da Chave *</label>
+          <select id="input-tipo" required>
+            <option value="">Selecione...</option>
+            <option value="CPF">CPF</option>
+            <option value="CNPJ">CNPJ</option>
+            <option value="Telefone">Telefone</option>
+            <option value="Email">Email</option>
+            <option value="Aleatoria">Chave Aleatoria</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="input-chave">Chave PIX *</label>
+          <input type="text" id="input-chave" required placeholder="Chave PIX">
+        </div>
+        <p id="msg-erro" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none;"></p>
+        <div class="modal-buttons">
+          <button type="submit" class="btn">Salvar</button>
+          <button type="button" class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Confirmacao Exclusao -->
+  <div id="modal-confirm" class="modal">
+    <div class="modal-content">
+      <h2>Confirmar Exclusao</h2>
+      <p style="color:var(--text-secondary);margin-bottom:24px;">Tem certeza que deseja remover este funcionario?</p>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="fecharModalConfirm()">Cancelar</button>
+        <button class="btn" style="background:#ef4444;" onclick="confirmarExclusao()">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/chaves-pagamento.js"></script>
+</body>
+</html>

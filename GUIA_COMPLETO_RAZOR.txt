@@ -1,0 +1,701 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    GUIA COMPLETO — RAZOR INDÚSTRIA                         ║
+║              Referência para Criação de Novos Sites                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+══════════════════════════════════════════════════════════════════════════════
+                          SUMÁRIO
+══════════════════════════════════════════════════════════════════════════════
+
+1. VISÃO GERAL DO PROJETO
+2. ESTRUTURA DE PASTAS
+3. TECNOLOGIAS UTILIZADAS
+4. SISTEMA DE AUTENTICAÇÃO
+5. BASE DE DADOS (USUÁRIOS)
+6. API COMPLETA (ENDPOINTS)
+7. SISTEMA DE PERMISSÕES
+8. CRM — CLIENTES
+9. FOTOS DOS CLIENTES
+10. PAINEL DO COLABORADOR
+11. DESIGN SYSTEM (CSS)
+12. EFEITOS PREMIUM
+13. COMO CRIAR UM NOVO SITE
+14. CHECKLIST DE IMPLEMENTAÇÃO
+15. DICAS E BOAS PRÁTICAS
+
+══════════════════════════════════════════════════════════════════════════════
+1. VISÃO GERAL DO PROJETO
+══════════════════════════════════════════════════════════════════════════════
+
+O site Razor Indústria é um sistema completo com:
+• Site institucional (landing page)
+• Painel do colaborador (calculadoras, CRM, fotos)
+• Sistema de autenticação com permissões
+• CRUD de usuários
+• CRM conectado à base de funcionários
+• Upload e gerenciamento de fotos
+
+Empresa: Razor Indústria — Telas, Alambrados e Concertinas
+Localização: Ribeirão Preto — SP
+Segmento: Segurança perimetral
+
+══════════════════════════════════════════════════════════════════════════════
+2. ESTRUTURA DE PASTAS
+══════════════════════════════════════════════════════════════════════════════
+
+projeto/
+├── server.js                    ← Servidor Node.js (Express)
+├── package.json                 ← Dependências
+├── .env                         ← Variáveis de ambiente
+├── data/
+│   ├── usuarios.json            ← Base de dados de usuários
+│   └── tags.json                ← Tags de imagens (opcional)
+├── rede/
+│   ├── fotos_clientes/          ← Fotos dos clientes
+│   └── [outras pastas de imagens]
+├── public/
+│   ├── index.html               ← Página inicial (landing page)
+│   ├── login.html               ← Página de login
+│   ├── funcionario.html         ← Painel do colaborador
+│   ├── permissoes.html          ← Gerenciar usuários (admin)
+│   ├── fotos/                   ← Imagens estáticas do site
+│   ├── css/
+│   │   ├── style.css            ← Estilos principais
+│   │   ├── premium.css          ← Efeitos premium
+│   │   └── funcionario.css      ← Estilos do painel
+│   └── js/
+│       ├── app.js               ← JavaScript principal (landing page)
+│       ├── funcionario.js       ← JavaScript do painel
+│       └── permissoes.js        ← JavaScript de permissões
+
+══════════════════════════════════════════════════════════════════════════════
+3. TECNOLOGIAS UTILIZADAS
+══════════════════════════════════════════════════════════════════════════════
+
+FRONTEND:
+• HTML5 semântico
+• CSS3 com variáveis (CSS Custom Properties)
+• JavaScript vanilla (sem frameworks)
+• Google Fonts: Barlow Condensed + Barlow
+• IndexedDB para dados locais (CRM, Fotos)
+
+BACKEND:
+• Node.js
+• Express.js
+• Busboy (upload de arquivos)
+• Cookie Parser
+• dotenv (variáveis de ambiente)
+• CORS
+
+BANCO DE DADOS:
+• JSON files (arquivos .json)
+• IndexedDB no navegador
+
+══════════════════════════════════════════════════════════════════════════════
+4. SISTEMA DE AUTENTICAÇÃO
+══════════════════════════════════════════════════════════════════════════════
+
+COMO FUNCIONA:
+
+1. Login via POST /api/login
+2. Retorna token aleatório
+3. Token armazenado no localStorage
+4. Token enviado via header Authorization: Bearer {token}
+5. Sessões mantidas em memória no servidor
+
+CÓDIGO DO SERVIDOR:
+
+// Login
+app.post('/api/login', (req, res) => {
+  const { usuario, senha } = req.body;
+  const users = JSON.parse(fs.readFileSync('data/usuarios.json', 'utf8'));
+
+  if (users[usuario] && users[usuario].senha === senha) {
+    // Verificar se está ativo
+    if (users[usuario].ativo === false) {
+      return res.status(403).json({ error: 'Usuário desativado' });
+    }
+    const token = Math.random().toString(36).substring(7);
+    sessions.set(token, { ...users[usuario], usuario });
+    res.json({ success: true, token, user: users[usuario] });
+  } else {
+    res.status(401).json({ error: 'Credenciais inválidas' });
+  }
+});
+
+// Middleware de autenticação
+function authenticate(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token || !sessions.has(token)) {
+    return res.status(401).json({ error: 'Não autorizado' });
+  }
+  req.user = sessions.get(token);
+  next();
+}
+
+CÓDIGO DO FRONTEND:
+
+// Salvar após login
+localStorage.setItem('token', response.token);
+localStorage.setItem('user', JSON.stringify(response.user));
+
+// Verificar ao carregar página
+const token = localStorage.getItem('token');
+const user = JSON.parse(localStorage.getItem('user'));
+if (!token || !user) {
+  window.location.href = 'login.html';
+}
+
+// Enviar em requisições
+fetch('/api/rota', {
+  headers: { 'Authorization': 'Bearer ' + token }
+});
+
+══════════════════════════════════════════════════════════════════════════════
+5. BASE DE DADOS (USUÁRIOS)
+══════════════════════════════════════════════════════════════════════════════
+
+ARQUIVO: data/usuarios.json
+
+ESTRUTURA:
+{
+  "login": {
+    "senha": "senha_aqui",
+    "nome": "Nome Completo",
+    "cargo": "vendedor|admin|engenheiro|logistica|funcionario",
+    "ativo": true|false,
+    "pode_ver_funcionario": true|false,
+    "pode_ver_imagens": true|false,
+    "pode_editar_imagens": true|false,
+    "pode_gerenciar_permissoes": true|false
+  }
+}
+
+CAMPOS EXPLICADOS:
+
+• login (chave) — Nome de usuário para login
+• senha — Senha em texto plano (simples para interno)
+• nome — Nome completo exibido no sistema
+• cargo — Define o papel no sistema:
+  - "admin" — Administrador total
+  - "vendedor" — Aparece no select do CRM
+  - "engenheiro" — Engenheiro
+  - "logistica" — Logística
+  - "funcionario" — Funcionário comum
+• ativo — Se false, não pode fazer login e não aparece como vendedor
+• pode_ver_funcionario — Pode ver o painel do colaborador
+• pode_ver_imagens — Pode ver a aba de imagens
+• pode_editar_imagens — Pode fazer upload/editar imagens
+• pode_gerenciar_permissoes — Pode gerenciar outros usuários
+
+EXEMPLO COMPLETO:
+{
+  "Miqueias": {
+    "senha": "M1que1as",
+    "nome": "Comercial 1",
+    "cargo": "vendedor",
+    "ativo": true,
+    "pode_ver_funcionario": true,
+    "pode_ver_imagens": true,
+    "pode_editar_imagens": false,
+    "pode_gerenciar_permissoes": false
+  }
+}
+
+══════════════════════════════════════════════════════════════════════════════
+6. API COMPLETA (ENDPOINTS)
+══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ AUTENTICAÇÃO                                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ POST /api/login                                                             │
+│ Body: { usuario, senha }                                                    │
+│ Resposta: { success, token, user }                                          │
+│                                                                             │
+│ POST /api/logout                                                             │
+│ Header: Authorization: Bearer {token}                                       │
+│ Resposta: { success }                                                       │
+│                                                                             │
+│ GET /api/me                                                                  │
+│ Header: Authorization: Bearer {token}                                       │
+│ Resposta: dados do usuário logado                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ USUÁRIOS (admin only)                                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ GET /api/usuarios                                                            │
+│ Resposta: { "login": { nome, cargo, ativo, permissoes... } }                │
+│                                                                             │
+│ POST /api/usuarios                                                           │
+│ Body: { usuario, nome, senha, cargo, ativo, permissoes }                    │
+│ Resposta: { success }                                                       │
+│                                                                             │
+│ PUT /api/usuarios/:id                                                        │
+│ Body: { nome, senha, cargo, ativo, permissoes }                             │
+│ Resposta: { success }                                                       │
+│                                                                             │
+│ DELETE /api/usuarios/:id                                                     │
+│ Resposta: { success }                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ VENDEDORES                                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ GET /api/vendedores                                                          │
+│ Retorna: funcionários com cargo "vendedor" E ativo !== false                │
+│ Resposta: [{ login, nome }]                                                 │
+│                                                                             │
+│ IMPORTANTE: Esta API alimenta o select do CRM                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ FOTOS DOS CLIENTES                                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ GET /api/fotos/pastas                                                        │
+│ Resposta: [{ nome, dataCriacao }]                                           │
+│                                                                             │
+│ POST /api/fotos/pastas                                                       │
+│ Body: { nome }                                                              │
+│ Resposta: { success, nome }                                                 │
+│                                                                             │
+│ DELETE /api/fotos/pastas/:nome                                               │
+│ Resposta: { success }                                                       │
+│                                                                             │
+│ GET /api/fotos/listar                                                        │
+│ Resposta: [{ nome, pasta }]                                                 │
+│                                                                             │
+│ POST /api/fotos/upload                                                       │
+│ Body: FormData { foto: file, pasta: "nome_pasta" }                          │
+│ Resposta: { success }                                                       │
+│                                                                             │
+│ GET /api/fotos/visualizar/:pasta/:arquivo                                    │
+│ Retorna: arquivo de imagem                                                  │
+│                                                                             │
+│ DELETE /api/fotos/:pasta/:arquivo                                            │
+│ Resposta: { success }                                                       │
+│                                                                             │
+│ POST /api/fotos/mover                                                        │
+│ Body: { nomeArquivo, pastaOrigem, pastaDestino }                            │
+│ Resposta: { success }                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ IMAGENS (Biblioteca)                                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ GET /api/categories                                                          │
+│ Resposta: ["categoria1", "categoria2"]                                      │
+│                                                                             │
+│ POST /api/categories                                                         │
+│ Body: { name }                                                              │
+│                                                                             │
+│ DELETE /api/categories/:name                                                 │
+│                                                                             │
+│ GET /api/images/:category                                                    │
+│ Resposta: ["arquivo1.jpg", "arquivo2.png"]                                  │
+│                                                                             │
+│ GET /api/image/:cat/:file                                                    │
+│ Retorna: arquivo de imagem                                                  │
+│                                                                             │
+│ POST /api/upload/:category                                                   │
+│ Body: FormData com arquivo                                                  │
+│                                                                             │
+│ DELETE /api/image/:cat/:file                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+══════════════════════════════════════════════════════════════════════════════
+7. SISTEMA DE PERMISSÕES
+══════════════════════════════════════════════════════════════════════════════
+
+NÍVEIS DE ACESSO:
+
+1. ADMIN (pode_gerenciar_permissoes: true)
+   - Gerenciar todos os usuários
+   - Ver tudo
+   - Editar tudo
+
+2. VENDEDOR (cargo: "vendedor")
+   - Aparece no select do CRM
+   - Pode ver o painel do colaborador
+
+3. FUNCIONÁRIO (pode_ver_funcionario: true)
+   - Pode ver o painel do colaborador
+   - Acesso às calculadoras
+
+COMO VERIFICAR NO FRONTEND:
+
+// Verificar se é admin
+if (user?.pode_gerenciar_permissoes) {
+  // Mostrar link de permissões
+}
+
+// Verificar se pode ver imagens
+if (user?.pode_ver_imagens) {
+  // Mostrar aba de imagens
+}
+
+// Verificar se pode ver funcionário
+if (user?.pode_ver_funcionario) {
+  // Permitir acesso ao painel
+}
+
+COMO VERIFICAR NO SERVIDOR:
+
+function requireAdmin(req, res, next) {
+  if (!req.user?.pode_gerenciar_permissoes) {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+  next();
+}
+
+// Usar nas rotas
+app.get('/api/rota-protegida', authenticate, requireAdmin, (req, res) => {
+  // Só admins chegam aqui
+});
+
+══════════════════════════════════════════════════════════════════════════════
+8. CRM — CLIENTES
+══════════════════════════════════════════════════════════════════════════════
+
+O CRM usa IndexedDB no navegador para armazenar clientes.
+
+ESTRUTURA DO CLIENTE:
+{
+  id: string (gerado automaticamente),
+  nome: string (obrigatório),
+  empresa: string,
+  telefone: string,
+  email: string,
+  vendedor: string (carregado da API /api/vendedores),
+  observacoes: string,
+  dataCriacao: Date,
+  dataAtualizacao: Date
+}
+
+COMO O SELECT DE VENDEDORES FUNCIONA:
+
+1. Ao abrir modal de criar/editar cliente
+2. Função carregarVendedoresSelect() é chamada
+3. Busca API /api/vendedores
+4. Retorna funcionários com cargo "vendedor" e ativo !== false
+5. Popula o select automaticamente
+
+CÓDIGO:
+async function carregarVendedoresSelect(vendedorAtual) {
+  const select = document.getElementById('crm-vendedor');
+  const resp = await fetch('/api/vendedores', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  const vendedores = await resp.json();
+
+  select.innerHTML = '<option value="">Selecione o vendedor</option>';
+  vendedores.forEach(v => {
+    select.innerHTML += `<option value="${v.nome}">${v.nome}</option>`;
+  });
+}
+
+FUNCTIONS PRINCIPAIS:
+
+• crmNovoUI() — Abre modal para criar
+• crmEditarUI(id) — Abre modal para editar
+• crmExcluirUI(id) — Exclui com confirmação
+• crmRenderizar() — Renderiza tabela
+• crmFiltrarVendedor(valor) — Filtra por vendedor
+• crmBuscar(valor) — Busca por nome/empresa
+• crmExportarJSON() — Exporta clientes
+• crmImportarJSON() — Importa clientes
+
+══════════════════════════════════════════════════════════════════════════════
+9. FOTOS DOS CLIENTES
+══════════════════════════════════════════════════════════════════════════════
+
+As fotos são salvas no SERVIDOR (não no navegador).
+
+PASTA DE DESTINO:
+./rede/fotos_clientes/
+
+Para alterar, edite no server.js:
+const FOTOS_CLIENTES_PATH = process.env.FOTOS_CLIENTES_PATH || './rede/fotos_clientes';
+
+E no funcionario.js (constante no topo):
+const FOTOS_PASTA_SERVIDOR = './rede/fotos_clientes';
+
+ESTRUTURA DE PASTAS:
+fotos_clientes/
+├── pasta1/
+│   ├── foto1.jpg
+│   └── foto2.png
+├── pasta2/
+│   └── foto3.jpg
+└── foto_avulsa.jpg
+
+FUNCTIONS PRINCIPAIS:
+
+• fotosCriarPastaUI() — Cria nova pasta
+• fotosAdicionarFotoUI() — Adiciona fotos (pergunta pasta)
+• fotosExcluirFotoUI(pasta, nome) — Exclui foto
+• fotosExcluirPastaUI(nome) — Exclui pasta e fotos
+• fotosMoverFotoUI(arquivo, origem, destino) — Move foto
+• fotosRenderizar() — Renderiza grid de fotos
+
+══════════════════════════════════════════════════════════════════════════════
+10. PAINEL DO COLABORADOR
+══════════════════════════════════════════════════════════════════════════════
+
+O painel possui as seguintes abas:
+
+1. PRAZO DE PRODUÇÃO
+   - Calcula horas/dias de fabricação
+   - Tabela de produtividade (m²/hora) editável
+   - Salva em CSV ou localStorage
+
+2. CONVERSOR
+   - Converte entre mm, cm, m, km
+
+3. MURETA
+   - Calcula materiais para construção de mureta
+   - Blocos, cimento, areia, pedrisco
+
+4. MALHA/BOBINA
+   - Calcula peso de bobinas de malha
+   - Tabela de pesos editável
+
+5. FOTOS
+   - Gerencia fotos dos clientes
+   - Criar pastas, upload, mover, excluir
+
+6. CRM
+   - Cadastro de clientes
+   - Filtro por vendedor
+   - Busca por nome/empresa
+
+NAVEGAÇÃO ENTRE ABAS:
+
+function trocarTela(tela) {
+  document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
+  document.querySelectorAll('.btn-menu').forEach(b => b.classList.remove('ativo'));
+
+  const mapa = {
+    producao: 'tela-producao',
+    conversor: 'tela-conversor',
+    mureta: 'tela-mureta',
+    malha: 'tela-malha',
+    fotos: 'tela-fotos',
+    crm: 'tela-crm'
+  };
+
+  const id = mapa[tela];
+  if (id) {
+    document.getElementById(id)?.classList.add('ativa');
+    document.getElementById('menu-' + tela)?.classList.add('ativo');
+  }
+}
+
+══════════════════════════════════════════════════════════════════════════════
+11. DESIGN SYSTEM (CSS)
+══════════════════════════════════════════════════════════════════════════════
+
+VARIÁVEIS CSS ( tokens ):
+
+:root {
+  /* Cores de fundo */
+  --bg-primary: #0A0A0A;
+  --bg-secondary: #111214;
+  --bg-card: #1A1C1F;
+  --bg-steel: #252830;
+
+  /* Cor de destaque */
+  --accent: #FFC03A;
+  --accent-hover: #ffbb28;
+  --accent-glow: rgba(104, 71, 0, 0.4);
+  --accent-border: rgba(255, 192, 58, 0.3);
+
+  /* Textos */
+  --text-primary: #F5F5F5;
+  --text-secondary: #C8CDD8;
+  --text-muted: #8A8E97;
+
+  /* Bordas */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.14);
+
+  /* Sombras */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+
+  /* Tipografia */
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body: 'Barlow', sans-serif;
+}
+
+FONTES:
+• Display (títulos): Barlow Condensed
+• Body (textos): Barlow
+• Fallback: sans-serif
+
+BOTÕES:
+• .btn — Primário (dourado)
+• .btn-secondary — Borda transparente
+• .btn-ghost — Sem fundo
+• .btn-sm — Pequeno
+• .btn-lg — Grande
+• .btn-success — Verde (WhatsApp)
+
+══════════════════════════════════════════════════════════════════════════════
+12. EFEITOS PREMIUM
+══════════════════════════════════════════════════════════════════════════════
+
+O arquivo premium.css adiciona:
+
+1. TEXTURA NOISE
+   - Overlay sutil de ruído industrial
+   - Opacidade: 2.5%
+
+2. GRADIENTES METÁLICOS
+   - Textos com gradiente branco/prata
+   - Botões com gradiente dourado
+
+3. EFEITO SHIMMER
+   - Brilho percorrendo o botão ao hover
+   - Usa ::before com gradiente
+
+4. GLASSMORPHISM
+   - Navbar com blur + saturate
+   - Badges com fundo semi-transparente
+
+5. SOMBRAS PREMIUM
+   - Sombras maiores e mais suaves
+   - Glow dourado sutil
+
+6. TRANSIÇÕES CUBIC-BEZIER
+   - Animações com curva (0.16, 1, 0.3, 1)
+   - Sensação de elasticidade
+
+7. SCROLLBAR PERSONALIZADA
+   - Barra dourada
+   - Hover com brilho
+
+══════════════════════════════════════════════════════════════════════════════
+13. COMO CRIAR UM NOVO SITE
+══════════════════════════════════════════════════════════════════════════════
+
+PASSO A PASSO:
+
+1. CRIAR ESTRUTURA DE PASTAS
+   mkdir novo-projeto
+   cd novo-projeto
+   mkdir public/css public/js public/fotos data
+
+2. INICIALIZAR NODE.JS
+   npm init -y
+   npm install express cors busboy cookie-parser dotenv
+
+3. CRIAR server.js
+   - Copiar estrutura do server.js da Razor
+   - Alterar constantes (PORT, IMAGES_PATH)
+   - Manter todas as APIs de autenticação
+
+4. CRIAR data/usuarios.json
+   - Copiar estrutura
+   - Alterar senhas e nomes
+   - Definir permissões
+
+5. CRIAR PÁGINAS HTML
+   - index.html (landing page)
+   - login.html
+   - funcionario.html (painel)
+   - permissoes.html (admin)
+
+6. CRIAR CSS
+   - style.css (estilos base)
+   - premium.css (efeitos premium)
+   - funcionario.css (estilos do painel)
+
+7. CRIAR JAVASCRIPT
+   - app.js (landing page)
+   - funcionario.js (painel)
+   - permissoes.js (admin)
+
+8. CRIAR .env
+   PORT=3000
+   IMAGES_PATH=./imagens
+   FOTOS_CLIENTES_PATH=./fotos_clientes
+
+9. TESTAR
+   node server.js
+   Acesse http://localhost:3000
+
+══════════════════════════════════════════════════════════════════════════════
+14. CHECKLIST DE IMPLEMENTAÇÃO
+══════════════════════════════════════════════════════════════════════════════
+
+□ Configurar server.js com todas as APIs
+□ Criar data/usuarios.json com usuários iniciais
+□ Criar página de login funcional
+□ Implementar sistema de autenticação
+□ Criar middleware de verificação de token
+□ Adicionar campo "ativo" aos usuários
+□ Verificar "ativo" no login
+□ Conectar vendedores ao CRM
+□ Configurar upload de fotos
+□ Criar pastas necessárias
+□ Testar todas as APIs
+□ Testar login/logout
+□ Testar permissões de admin
+□ Testar CRM com vendedores
+□ Testar upload de fotos
+□ Adicionar CSS premium
+□ Testar responsividade
+□ Testar em diferentes navegadores
+
+══════════════════════════════════════════════════════════════════════════════
+15. DICAS E BOAS PRÁTICAS
+══════════════════════════════════════════════════════════════════════════════
+
+SEGURANÇA:
+• Em produção, usar hash de senhas (bcrypt)
+• Usar JWT em vez de tokens aleatórios
+• Adicionar rate limiting
+• Validar todos os inputs no servidor
+• Usar HTTPS
+
+PERFORMANCE:
+• Comprimir imagens antes de upload
+• Usar lazy loading em imagens
+• Minificar CSS/JS em produção
+• Usar cache headers
+
+CÓDIGO:
+• Manter organização por funcionalidade
+• Usar CSS variables para temas
+• Comentar código complexo
+• Funções pequenas e reutilizáveis
+
+UI/UX:
+• Testar em mobile primeiro
+• Garantir contraste adequado (4.5:1)
+• Fornecer feedback em ações
+• Tratar estados de erro e vazio
+• Respetar prefers-reduced-motion
+
+ARQUIVOS IMPORTANTES PARA REPLICAR:
+• server.js — Copiar e adaptar
+• data/usuarios.json — Copiar e alterar
+• css/style.css — Copiar design system
+• css/premium.css — Copiar efeitos premium
+• js/app.js — Copiar lógica de login/auth
+
+══════════════════════════════════════════════════════════════════════════════
+                         FIM DO GUIA
+══════════════════════════════════════════════════════════════════════════════
+
+Projeto: Razor Indústria
+Desenvolvido por: MiMoCode
+Data: Julho 2026
+
+Este guia serve como referência completa para criar novos sites
+com a mesma estrutura, autenticação, CRM e design premium.
+
+══════════════════════════════════════════════════════════════════════════════

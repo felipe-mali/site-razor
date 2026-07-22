@@ -1,0 +1,68 @@
+{
+  "admin": {
+    "senha": "M@lima2026",
+    "nome": "Admin Principal",
+    "cargo": "admin",
+    "ativo": true,
+    "pode_ver_funcionario": true,
+    "pode_ver_imagens": true,
+    "pode_editar_imagens": true,
+    "pode_gerenciar_permissoes": true,
+    "pode_acessar_cotacoes": true
+  },
+  "felipe": {
+    "senha": "Lim@0207",
+    "nome": "Engenheiro Felipe",
+    "cargo": "engenheiro",
+    "ativo": true,
+    "pode_ver_funcionario": true,
+    "pode_ver_imagens": true,
+    "pode_editar_imagens": true,
+    "pode_gerenciar_permissoes": true,
+    "pode_acessar_cotacoes": true
+  },
+  "kelvin": {
+    "senha": "logistica",
+    "nome": "Logistica",
+    "cargo": "logistica",
+    "ativo": true,
+    "pode_ver_funcionario": true,
+    "pode_ver_imagens": true,
+    "pode_editar_imagens": false,
+    "pode_gerenciar_permissoes": false,
+    "pode_acessar_cotacoes": true
+  },
+  "miqueias": {
+    "senha": "M1que1as",
+    "nome": "Comercial 1",
+    "cargo": "vendedor",
+    "ativo": true,
+    "pode_ver_funcionario": true,
+    "pode_ver_imagens": true,
+    "pode_editar_imagens": false,
+    "pode_gerenciar_permissoes": false,
+    "pode_acessar_cotacoes": false
+  },
+  "andre": {
+    "senha": "@ndre123",
+    "nome": "Comercial 2",
+    "cargo": "vendedor",
+    "ativo": true,
+    "pode_ver_funcionario": true,
+    "pode_ver_imagens": true,
+    "pode_editar_imagens": true,
+    "pode_gerenciar_permissoes": false,
+    "pode_acessar_cotacoes": false
+  },
+  "daniela": {
+    "senha": "D@cris83",
+    "nome": "Comercial 3",
+    "cargo": "vendedor",
+    "ativo": true,
+    "pode_ver_funcionario": true,
+    "pode_ver_imagens": true,
+    "pode_editar_imagens": true,
+    "pode_gerenciar_permissoes": true,
+    "pode_acessar_cotacoes": true
+  }
+}

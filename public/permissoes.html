@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0A0A0A">
+  <title>Permissões - Razor Indústria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="panel-page">
+  <header id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-logo">
+        <img src="fotos/logo.jpg" alt="Razor Indústria" class="logo">
+      </a>
+      <nav>
+        <a href="index.html">Início</a>
+        <a href="funcionario.html">Painel</a>
+        <a href="permissoes.html" class="active">Permissões</a>
+        <a href="#" id="btn-sair" class="btn btn-ghost btn-sm">Sair</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="nav-overlay"></div>
+  </header>
+
+  <div class="panel-header">
+    <div class="container">
+      <h1>Gerenciar <span>Usuários</span></h1>
+    </div>
+  </div>
+
+  <main class="container permissoes-page">
+    <div class="perm-header">
+      <p style="color:var(--text-secondary);">Gerencie as permissões dos colaboradores.</p>
+      <button class="btn" onclick="abrirModal()">+ Novo Usuário</button>
+    </div>
+
+    <div class="table-wrapper">
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Usuário</th>
+              <th>Nome</th>
+              <th>Cargo</th>
+              <th>Ativo</th>
+              <th>Ver Imagens</th>
+              <th>Editar Imagens</th>
+              <th>Admin</th>
+              <th>Cotação de Preços</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-usuarios"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <h2 id="modal-title">Novo Usuário</h2>
+      <form id="usuario-form">
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+          <label for="input-usuario">Usuário</label>
+          <input type="text" id="input-usuario" required placeholder="Nome de usuário">
+        </div>
+        <div class="form-group">
+          <label for="input-nome">Nome</label>
+          <input type="text" id="input-nome" required placeholder="Nome completo">
+        </div>
+        <div class="form-group">
+          <label for="input-senha">Senha</label>
+          <input type="password" id="input-senha" placeholder="Deixe vazio para manter">
+        </div>
+        <div class="form-group">
+          <label for="input-cargo">Cargo</label>
+          <select id="input-cargo">
+            <option value="funcionario">Funcionário</option>
+            <option value="vendedor">Vendedor</option>
+            <option value="engenheiro">Engenheiro</option>
+            <option value="logistica">Logística</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="input-ativo" checked> Ativo
+          </label>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="perm-func"> Ver Imagens
+          </label>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="perm-editar"> Editar Imagens
+          </label>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="perm-admin"> Administrador
+          </label>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="perm-cotacoes"> Cotação de Preços
+          </label>
+          <small style="display:block;margin-top:6px;color:var(--text-secondary);">
+            Logística e administradores com todos os direitos possuem acesso automático.
+          </small>
+        </div>
+        <div class="modal-buttons">
+          <button type="submit" class="btn">Salvar</button>
+          <button type="button" class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/permissoes.js"></script>
+</body>
+</html>
