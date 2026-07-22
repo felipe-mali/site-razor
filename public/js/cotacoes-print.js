@@ -1,23 +1,16 @@
-(function cotacoesPrintUmd(root, factory) {
-  if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./cotacoes-financeiro.js'));
-  } else {
-    root.CotacoesPrintView = factory(root.CotacoesFinanceiro);
-  }
-}(typeof globalThis !== 'undefined' ? globalThis : this, function criarCotacoesPrintView(CotacoesFinanceiro) {
+(function carregarCotacoesPrint(root, factory) {
   'use strict';
 
-  if (!CotacoesFinanceiro || typeof CotacoesFinanceiro.calcularCotacao !== 'function') {
-    throw new Error('CotacoesPrintView requer CotacoesFinanceiro.');
-  }
+  var financeiro = typeof module === 'object' && module.exports
+    ? require('./cotacoes-financeiro')
+    : root && root.CotacoesFinanceiro;
+  var api = factory(financeiro);
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.CotacoesPrintView = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function criarCotacoesPrintView(Financeiro) {
+  'use strict';
 
-  var STATUS_LABELS = {
-    em_andamento: 'Em andamento',
-    aguardando_aprovacao: 'Aguardando aprovação',
-    aprovada: 'Aprovada',
-    finalizada: 'Finalizada',
-    cancelada: 'Cancelada'
-  };
+  if (!Financeiro) throw new Error('CotacoesFinanceiro é obrigatório para a impressão.');
 
   function escapar(valor) {
     return String(valor === undefined || valor === null ? '' : valor)
@@ -28,281 +21,187 @@
       .replace(/'/g, '&#039;');
   }
 
-  function texto(valor, fallback) {
-    var normalizado = String(valor === undefined || valor === null ? '' : valor).trim();
-    return escapar(normalizado || fallback || '—');
-  }
-
-  function dinheiro(centavos) {
-    return centavos === null || centavos === undefined
-      ? '—'
-      : escapar(CotacoesFinanceiro.formatarCentavos(centavos));
-  }
-
-  function quantidade(millesimos) {
-    return millesimos === null || millesimos === undefined
-      ? '—'
-      : escapar(CotacoesFinanceiro.formatarQuantidade(millesimos));
-  }
-
-  function dataPt(valor, incluirHora) {
-    if (!valor) return '—';
-    var somenteData = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(valor));
-    if (somenteData) return somenteData[3] + '/' + somenteData[2] + '/' + somenteData[1];
-    var data = new Date(valor);
-    if (Number.isNaN(data.getTime())) return texto(valor);
-    var opcoes = { day: '2-digit', month: '2-digit', year: 'numeric' };
-    if (incluirHora) {
-      opcoes.hour = '2-digit';
-      opcoes.minute = '2-digit';
-    }
-    return escapar(new Intl.DateTimeFormat('pt-BR', opcoes).format(data));
-  }
-
-  function formatarCnpj(valor) {
-    var digitos = String(valor || '').replace(/\D/g, '');
-    if (digitos.length !== 14) return texto(valor);
-    return digitos.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-  }
-
-  function obterId(entidade) {
-    return String(entidade && (entidade.id || entidade._id || entidade.itemId || entidade.fornecedorId) || '');
-  }
-
-  function obterNomeFornecedor(fornecedor) {
-    return fornecedor.nome || fornecedor.nomeFantasia || fornecedor.razaoSocial || 'Fornecedor sem identificação';
-  }
-
   function dividirEmBlocos(lista, tamanho) {
+    var limite = Number.isInteger(tamanho) && tamanho > 0 ? tamanho : 3;
     var blocos = [];
-    for (var indice = 0; indice < lista.length; indice += tamanho) {
-      blocos.push(lista.slice(indice, indice + tamanho));
+    for (var indice = 0; indice < lista.length; indice += limite) {
+      blocos.push(lista.slice(indice, indice + limite));
     }
     return blocos.length ? blocos : [[]];
   }
 
-  function mapaPorId(lista, campo) {
-    var mapa = new Map();
-    (lista || []).forEach(function adicionar(item) {
-      mapa.set(String(item[campo] || item.id || ''), item);
-    });
-    return mapa;
+  function comoData(valor) {
+    if (!valor) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(valor))) {
+      var partes = String(valor).split('-');
+      return partes[2] + '/' + partes[1] + '/' + partes[0];
+    }
+    var data = new Date(valor);
+    if (Number.isNaN(data.getTime())) return null;
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(data);
   }
 
-  function normalizarOpcoes(cotacao, opcoes, calculos) {
-    var entrada = opcoes || {};
-    var idsSelecionados = Array.isArray(entrada.fornecedorIds)
-      ? new Set(entrada.fornecedorIds.map(String))
-      : null;
-    var calculosFornecedor = mapaPorId(calculos.fornecedores, 'fornecedorId');
-    var fornecedores = (cotacao.fornecedores || []).filter(function filtrar(fornecedor) {
-      var id = obterId(fornecedor);
-      if (idsSelecionados && !idsSelecionados.has(id)) return false;
-      if (entrada.incluirFornecedoresIncompletos === false) {
-        var calculo = calculosFornecedor.get(id);
-        return Boolean(calculo && calculo.completo);
-      }
-      return true;
-    });
-
-    return {
-      fornecedores: fornecedores,
-      incluirObservacoes: entrada.incluirObservacoes !== false,
-      incluirAssinaturas: entrada.incluirAssinaturas !== false,
-      logoUrl: entrada.logoUrl || 'fotos/logo.jpg',
-      nomeEmpresa: entrada.nomeEmpresa || 'Razor Indústria',
-      razaoSocialEmpresa: entrada.razaoSocialEmpresa || '',
-      emitidoEm: entrada.emitidoEm || new Date().toISOString()
-    };
+  function numeroTemporario(valorData) {
+    var data = valorData instanceof Date ? valorData : new Date(valorData || Date.now());
+    if (Number.isNaN(data.getTime())) data = new Date();
+    var partes = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(data).reduce(function (acumulado, parte) {
+      acumulado[parte.type] = parte.value;
+      return acumulado;
+    }, {});
+    return partes.day + partes.month + partes.year + '-' + partes.hour + partes.minute;
   }
 
-  function renderizarCabecalho(cotacao, opcoes, indiceBloco, totalBlocos) {
-    var numero = cotacao.numero || cotacao.numeroCotacao || 'Rascunho';
-    var responsavel = cotacao.responsavelNome || cotacao.criadoPorNome || cotacao.responsavel || '—';
-    if (responsavel && typeof responsavel === 'object') responsavel = responsavel.nome || responsavel.usuario || '—';
-    var criadoEm = cotacao.criadoEm || cotacao.dataCriacao || cotacao.createdAt;
-    var status = STATUS_LABELS[cotacao.status] || cotacao.status || 'Em andamento';
-
-    return '<header class="cot-print-header">' +
-      '<img class="cot-print-logo" src="' + escapar(opcoes.logoUrl) + '" alt="Logotipo ' + escapar(opcoes.nomeEmpresa) + '">' +
-      '<div class="cot-print-company"><h1>Cotação de Preços</h1><p>' + texto(opcoes.nomeEmpresa) +
-        (opcoes.razaoSocialEmpresa ? ' · ' + texto(opcoes.razaoSocialEmpresa) : '') + '</p></div>' +
-      '<div class="cot-print-meta"><strong>' + texto(numero) + '</strong><span>Emissão: ' + dataPt(opcoes.emitidoEm, false) + '</span></div>' +
-    '</header>' +
-    '<div class="cot-print-context">' +
-      '<div><small>Data de criação</small><span>' + dataPt(criadoEm, false) + '</span></div>' +
-      '<div><small>Responsável</small><span>' + texto(responsavel) + '</span></div>' +
-      '<div><small>Departamento</small><span>' + texto(cotacao.departamento) + '</span></div>' +
-      '<div><small>Centro de custo</small><span>' + texto(cotacao.centroCusto) + '</span></div>' +
-      '<div><small>Status</small><span>' + texto(status) + '</span></div>' +
-    '</div>' +
-    '<p class="cot-print-block-label">Bloco ' + (indiceBloco + 1) + ' de ' + totalBlocos + '</p>';
+  function produtoCalculado(calculos, produtoId) {
+    return calculos.produtos.find(function (produto) { return produto.produtoId === produtoId; });
   }
 
-  function renderizarFornecedores(fornecedores, calculosFornecedor) {
-    var colunas = Math.max(1, fornecedores.length);
-    return '<section class="cot-print-suppliers" style="grid-template-columns:repeat(' + colunas + ',minmax(0,1fr))">' +
-      fornecedores.map(function renderizarFornecedor(fornecedor) {
-        var id = obterId(fornecedor);
-        var calculo = calculosFornecedor.get(id) || {};
-        var recomendado = calculo.recomendado === true;
-        return '<article class="cot-print-supplier' + (recomendado ? ' recommended' : '') + '">' +
-          '<h3>' + texto(obterNomeFornecedor(fornecedor)) + (recomendado ? ' · RECOMENDADO' : '') + '</h3>' +
-          '<dl>' +
-            '<dt>Razão social</dt><dd>' + texto(fornecedor.razaoSocial) + '</dd>' +
-            '<dt>CNPJ</dt><dd>' + formatarCnpj(fornecedor.cnpj) + '</dd>' +
-            '<dt>Pagamento</dt><dd>' + texto(fornecedor.formaPagamento) + '</dd>' +
-            '<dt>Prazo</dt><dd>' + texto(fornecedor.prazoEntrega) + '</dd>' +
-            '<dt>Frete</dt><dd>' + dinheiro(fornecedor.freteCentavos || 0) + '</dd>' +
-            '<dt>Validade</dt><dd>' + dataPt(fornecedor.validadeProposta, false) + '</dd>' +
-          '</dl>' +
-        '</article>';
-      }).join('') +
-    '</section>';
+  function fornecedorCalculado(calculos, fornecedorId) {
+    return calculos.fornecedores.find(function (fornecedor) { return fornecedor.fornecedorId === fornecedorId; });
   }
 
-  function renderizarTabela(cotacao, fornecedores, calculos, opcoes) {
-    var calculosItens = mapaPorId(calculos.itens, 'itemId');
-    var calculosFornecedores = mapaPorId(calculos.fornecedores, 'fornecedorId');
-    var precos = new Map();
-    (cotacao.precos || []).forEach(function indexarPreco(preco) {
-      precos.set(String(preco.itemId) + '::' + String(preco.fornecedorId), preco);
-    });
+  function cabecalho(numero, data, bloco, indice, totalBlocos) {
+    return '' +
+      '<header class="cot-print-header">' +
+        '<div><h1>Cotação de Preços</h1><p>Comparativo temporário de valores por produto e fornecedor</p></div>' +
+        '<div class="cot-print-meta">' +
+          '<span>Cotação<strong>' + escapar(numero) + '</strong></span>' +
+          '<span>Data<strong>' + escapar(data) + '</strong></span>' +
+        '</div>' +
+      '</header>' +
+      '<p class="cot-print-block-label">Bloco ' + (indice + 1) + ' de ' + totalBlocos +
+        (bloco.length ? ' · ' + escapar(bloco.map(function (fornecedor) { return fornecedor.nome; }).join(' · ')) : '') +
+      '</p>';
+  }
 
-    var cabecalhoFornecedor = fornecedores.map(function cabecalho(fornecedor) {
-      return '<th colspan="2">' + texto(obterNomeFornecedor(fornecedor)) + '</th>';
+  function tabela(estado, calculos, bloco) {
+    var grupos = bloco.map(function (fornecedor) {
+      return '<th colspan="2" scope="colgroup">' + escapar(fornecedor.nome) + '</th>';
     }).join('');
-    var subcabecalhoFornecedor = fornecedores.map(function subcabecalho() {
-      return '<th>Unitário</th><th>Total</th>';
+    var subgrupos = bloco.map(function () {
+      return '<th scope="col">Valor unit.</th><th scope="col">Valor total</th>';
     }).join('');
-
-    var linhas = (cotacao.itens || []).filter(function apenasAtivos(item) {
-      return item.ativo !== false;
-    }).map(function renderizarItem(item, indice) {
-      var itemId = obterId(item);
-      var calculoItem = calculosItens.get(itemId) || {};
-      var calculosPreco = mapaPorId(calculoItem.precos, 'fornecedorId');
-      var colunas = fornecedores.map(function renderizarPreco(fornecedor) {
-        var fornecedorId = obterId(fornecedor);
-        var precoOriginal = precos.get(itemId + '::' + fornecedorId) || {};
-        var precoCalculado = calculosPreco.get(fornecedorId) || {};
-        var indisponivel = precoOriginal.indisponivel === true;
-        if (indisponivel || !precoCalculado.valido) {
-          return '<td class="unavailable" colspan="2">' + (indisponivel ? 'Indisponível' : '—') + '</td>';
-        }
-        var classeMenor = precoCalculado.menorPreco ? ' best-price' : '';
-        return '<td class="money' + classeMenor + '">' + dinheiro(precoCalculado.valorUnitarioCentavos) + '</td>' +
-          '<td class="money">' + dinheiro(precoCalculado.valorTotalCentavos) + '</td>';
+    var linhas = estado.produtos.map(function (produto, indice) {
+      var calculado = produtoCalculado(calculos, produto.id);
+      var precos = bloco.map(function (fornecedor) {
+        var preco = calculado.porFornecedor[fornecedor.id];
+        return '' +
+          '<td class="cot-print-money" data-best="' + String(Boolean(preco.menorPreco)) + '"' +
+            (preco.menorPreco ? ' title="Menor preço deste produto"' : '') + '>' +
+            Financeiro.formatarMoeda(preco.valorUnitarioCentavos, '') +
+            (preco.menorPreco ? '<span class="sr-only"> Menor preço deste produto</span>' : '') +
+          '</td>' +
+          '<td class="cot-print-money">' + Financeiro.formatarMoeda(preco.valorTotalCentavos, '') + '</td>';
       }).join('');
-
-      var observacaoItem = opcoes.incluirObservacoes && item.observacao
-        ? '<br><small>Obs. ' + texto(item.observacao) + '</small>'
-        : '';
-
-      return '<tr>' +
-        '<td class="item-number">' + (indice + 1) + '</td>' +
-        '<td class="item-description">' + texto(item.descricao) + (item.codigo ? '<br><small>Cód. ' + texto(item.codigo) + '</small>' : '') + observacaoItem + '</td>' +
-        '<td class="item-unit">' + texto(item.unidade, 'UN') + '</td>' +
-        '<td class="item-quantity">' + quantidade(item.quantidadeMillesimos) + '</td>' +
-        colunas +
-        '<td class="money ideal">' + dinheiro(calculoItem.custoIdealUnitarioCentavos) + '</td>' +
-        '<td class="money ideal">' + dinheiro(calculoItem.custoIdealTotalCentavos) + '</td>' +
-      '</tr>';
+      return '' +
+        '<tr>' +
+          '<th class="cot-print-number" scope="row">' + (indice + 1) + '</th>' +
+          '<td class="cot-print-product">' + escapar(produto.descricao || 'Produto sem descrição') + '</td>' +
+          '<td class="cot-print-quantity">' + Financeiro.formatarQuantidade(produto.quantidadeMillesimos, '') + '</td>' +
+          precos +
+          '<td class="cot-print-money cot-print-ideal">' + Financeiro.formatarMoeda(calculado.menorValorUnitarioCentavos, '') + '</td>' +
+          '<td class="cot-print-money cot-print-ideal">' + Financeiro.formatarMoeda(calculado.custoIdealTotalCentavos, '') + '</td>' +
+        '</tr>';
     }).join('');
+    var totais = bloco.map(function (fornecedor) {
+      var calculado = fornecedorCalculado(calculos, fornecedor.id);
+      return '<td colspan="2" class="cot-print-money">' +
+        Financeiro.formatarMoeda(calculado.totalCentavos, 'R$ 0,00') + '<br>' +
+        '<span class="' + (calculado.completo ? 'cot-print-complete' : 'cot-print-incomplete') + '">' +
+          (calculado.completo ? 'Cotação completa' : 'Cotação incompleta: ' + calculado.faltantes + ' pendente(s)') +
+        '</span></td>';
+    }).join('');
+    var totalColunasRestantes = bloco.length * 2 + 2;
 
-    function linhaTotal(rotulo, propriedade) {
-      return '<tr><th colspan="4">' + rotulo + '</th>' + fornecedores.map(function totalFornecedor(fornecedor) {
-        var calculo = calculosFornecedores.get(obterId(fornecedor)) || {};
-        return '<td colspan="2">' + dinheiro(calculo[propriedade]) + '</td>';
-      }).join('') + '<td colspan="2" class="ideal">' + (propriedade === 'totalCentavos' ? dinheiro(calculos.custoIdealTotalCentavos) : '—') + '</td></tr>';
-    }
-
-    var completude = '<tr><th colspan="4">Cobertura da proposta</th>' + fornecedores.map(function fornecedorCompleto(fornecedor) {
-      var calculo = calculosFornecedores.get(obterId(fornecedor)) || {};
-      var classe = calculo.completo ? 'cot-print-complete' : 'cot-print-incomplete';
-      var label = calculo.completo ? '✓ Completa' : '⚠ Incompleta · faltam ' + (calculo.itensFaltantes || 0);
-      return '<td colspan="2" class="' + classe + '">' + label + '</td>';
-    }).join('') + '<td colspan="2" class="ideal">Custo ideal</td></tr>';
-
-    return '<table class="cot-print-table">' +
-      '<thead><tr><th rowspan="2" class="item-number">#</th><th rowspan="2" class="item-description">Descrição</th><th rowspan="2" class="item-unit">Un.</th><th rowspan="2" class="item-quantity">Qtd.</th>' + cabecalhoFornecedor + '<th colspan="2">Custo ideal</th></tr>' +
-      '<tr>' + subcabecalhoFornecedor + '<th>Unitário</th><th>Total</th></tr></thead>' +
-      '<tbody>' + (linhas || '<tr><td colspan="99">Nenhum item cadastrado.</td></tr>') + '</tbody>' +
-      '<tfoot>' + linhaTotal('Subtotal dos produtos', 'subtotalCentavos') + linhaTotal('Frete', 'freteCentavos') + linhaTotal('Total geral', 'totalCentavos') + completude + '</tfoot>' +
-    '</table>';
+    return '' +
+      '<table class="cot-print-table">' +
+        '<thead>' +
+          '<tr><th class="cot-print-number" rowspan="2" scope="col">Nº</th>' +
+            '<th class="cot-print-product" rowspan="2" scope="col">Produto</th>' +
+            '<th class="cot-print-quantity" rowspan="2" scope="col">Quantidade</th>' +
+            grupos + '<th class="cot-print-ideal" colspan="2" scope="colgroup">Custo ideal</th></tr>' +
+          '<tr>' + subgrupos + '<th class="cot-print-ideal" scope="col">Valor unit.</th><th class="cot-print-ideal" scope="col">Valor total</th></tr>' +
+        '</thead>' +
+        '<tbody>' + (linhas || '<tr><td colspan="' + (5 + bloco.length * 2) + '">Nenhum produto informado.</td></tr>') + '</tbody>' +
+        '<tfoot>' +
+          '<tr class="totals-row"><th colspan="3" scope="row">Totais</th>' + totais +
+            '<td colspan="2" class="cot-print-money">' + Financeiro.formatarMoeda(calculos.custoIdealTotalCentavos, '') + '<br><span>Custo ideal total</span></td></tr>' +
+          '<tr class="discount-row"><th colspan="3" scope="row">Desconto sugerido</th>' +
+            '<td colspan="' + totalColunasRestantes + '" class="cot-print-money">' +
+              Financeiro.formatarMoeda(calculos.descontoSugeridoCentavos) + ' · ' +
+              Financeiro.formatarPercentualBasisPoints(calculos.percentualNegociacaoBasisPoints) +
+            '</td></tr>' +
+        '</tfoot>' +
+      '</table>';
   }
 
-  function renderizarResumo(cotacao, calculos, opcoes, indiceBloco, totalBlocos) {
-    var fornecedoresPorId = mapaPorId(cotacao.fornecedores, 'id');
-    var recomendados = (calculos.fornecedorIdsRecomendados || []).map(function nome(id) {
-      var fornecedor = fornecedoresPorId.get(String(id));
-      return fornecedor ? obterNomeFornecedor(fornecedor) : id;
-    });
-    var percentual = calculos.percentualNegociacaoBasisPoints === null || calculos.percentualNegociacaoBasisPoints === undefined
-      ? '—'
-      : (calculos.percentualNegociacaoBasisPoints / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-    var aprovacao = cotacao.aprovacao || {};
-
-    var html = '<section class="cot-print-summary">' +
-      '<div><small>Custo ideal total</small><strong>' + dinheiro(calculos.custoIdealTotalCentavos) + '</strong></div>' +
-      '<div><small>Fornecedor recomendado</small><strong>' + texto(recomendados.join(' / '), 'Nenhum fornecedor completo') + '</strong></div>' +
-      '<div><small>Total recomendado</small><strong>' + dinheiro(calculos.totalRecomendadoCentavos) + '</strong></div>' +
-      '<div><small>Margem de negociação</small><strong>' + dinheiro(calculos.descontoSugeridoCentavos) + ' · ' + escapar(percentual) + '</strong></div>' +
-    '</section>';
-
-    html += '<section class="cot-print-description"><h3>Resumo da compra</h3><p>' +
-      texto(cotacao.descricaoCompra, 'Sem descrição informada.') + '</p>';
-    if (opcoes.incluirObservacoes && cotacao.observacoesInternas) {
-      html += '<h3 style="margin-top:5px">Observações</h3><p>' +
-        texto(cotacao.observacoesInternas) + '</p>';
-    }
-    html += '</section>';
-    if (opcoes.incluirAssinaturas) {
-      var dataAprovacao = aprovacao.data ? dataPt(aprovacao.data, false) : '____/____/________';
-      html += '<section class="cot-print-signatures">' +
-        '<div class="cot-print-signature">Elaborado por<br>' + texto(aprovacao.elaboradoPor || cotacao.responsavelNome, 'Nome / assinatura') + '<br><small>Data: ' + dataAprovacao + '</small></div>' +
-        '<div class="cot-print-signature">Conferido por<br>' + texto(aprovacao.conferidoPor, 'Nome / assinatura') + '<br><small>Data: ' + dataAprovacao + '</small></div>' +
-        '<div class="cot-print-signature">Aprovado por<br>' + texto(aprovacao.aprovadoPor, 'Nome / assinatura') + '<br><small>Data: ' + dataAprovacao + '</small></div>' +
+  function resumo(estado, calculos) {
+    var nomes = calculos.fornecedoresRecomendados.map(function (id) {
+      var fornecedor = estado.fornecedores.find(function (registro) { return registro.id === id; });
+      return fornecedor ? fornecedor.nome : '';
+    }).filter(Boolean).join(', ');
+    return '' +
+      '<section class="cot-print-summary" aria-label="Resumo financeiro">' +
+        '<div><small>Fornecedor recomendado</small><strong>' + escapar(nomes || 'Nenhum fornecedor completo') + '</strong></div>' +
+        '<div><small>Total recomendado</small><strong>' + Financeiro.formatarMoeda(calculos.totalRecomendadoCentavos) + '</strong></div>' +
+        '<div><small>Desconto sugerido</small><strong>' + Financeiro.formatarMoeda(calculos.descontoSugeridoCentavos) + '</strong></div>' +
+        '<div><small>Percentual de negociação</small><strong>' + Financeiro.formatarPercentualBasisPoints(calculos.percentualNegociacaoBasisPoints) + '</strong></div>' +
       '</section>';
-    }
-    html += '<footer class="cot-print-footer"><span>Documento gerado pelo módulo Cotação de Preços</span><span>Bloco ' + (indiceBloco + 1) + '/' + totalBlocos + ' · ' + texto(cotacao.numero || 'Rascunho') + '</span></footer>';
-    return html;
   }
 
-  function renderizar(cotacaoEntrada, opcoesEntrada) {
-    var cotacao = cotacaoEntrada || {};
-    var calculosGlobais = CotacoesFinanceiro.calcularCotacao(cotacao);
-    var opcoes = normalizarOpcoes(cotacao, opcoesEntrada, calculosGlobais);
-    var idsImpressos = new Set(opcoes.fornecedores.map(function mapearId(fornecedor) {
-      return obterId(fornecedor);
-    }));
-    var cotacaoImpressa = Object.assign({}, cotacao, {
-      fornecedores: opcoes.fornecedores,
-      precos: (cotacao.precos || []).filter(function filtrarPreco(preco) {
-        return idsImpressos.has(String(preco.fornecedorId));
-      })
-    });
-    var calculos = CotacoesFinanceiro.calcularCotacao(cotacaoImpressa);
-    var recomendados = new Set((calculos.fornecedorIdsRecomendados || []).map(String));
-    (calculos.fornecedores || []).forEach(function marcarRecomendado(fornecedor) {
-      fornecedor.recomendado = recomendados.has(String(fornecedor.fornecedorId));
-    });
-    var blocos = dividirEmBlocos(opcoes.fornecedores, 3);
-    var calculosFornecedor = mapaPorId(calculos.fornecedores, 'fornecedorId');
+  function informacoesFinais(estado, data) {
+    var dados = estado.impressao || {};
+    return '' +
+      '<section class="cot-print-description">' +
+        '<h2>Descrição / resumo da compra</h2>' +
+        '<p>' + escapar(dados.descricao || 'Não informado.') + '</p>' +
+      '</section>' +
+      '<section class="cot-print-signatures" aria-label="Assinaturas">' +
+        '<div class="cot-print-signature"><strong>' + escapar(dados.elaboradoPor || '') + '</strong><br>Elaborado por · Data: ' + escapar(data) + '</div>' +
+        '<div class="cot-print-signature"><strong>' + escapar(dados.aprovadoPor || '') + '</strong><br>Aprovado por · Data: ____/____/________</div>' +
+      '</section>';
+  }
 
-    return blocos.map(function renderizarBloco(fornecedores, indice) {
-      return '<article class="cot-print-sheet" data-print-block="' + (indice + 1) + '">' +
-        renderizarCabecalho(cotacao, opcoes, indice, blocos.length) +
-        renderizarFornecedores(fornecedores, calculosFornecedor) +
-        renderizarTabela(cotacao, fornecedores, calculos, opcoes) +
-        renderizarResumo(cotacao, calculos, opcoes, indice, blocos.length) +
-      '</article>';
+  function renderizar(estado, opcoes) {
+    if (!estado || !Array.isArray(estado.produtos) || !Array.isArray(estado.fornecedores)) {
+      throw new TypeError('Estado inválido para impressão.');
+    }
+    opcoes = opcoes || {};
+    var emitidoEm = opcoes.emitidoEm || new Date().toISOString();
+    var dados = estado.impressao || {};
+    var numero = String(dados.numero || '').trim() || numeroTemporario(emitidoEm);
+    var data = comoData(dados.data) || comoData(emitidoEm) || '—';
+    var calculos = Financeiro.calcularCotacao(estado);
+    var blocos = dividirEmBlocos(estado.fornecedores, 3);
+
+    return blocos.map(function (bloco, indice) {
+      var ultimo = indice === blocos.length - 1;
+      return '' +
+        '<article class="cot-print-sheet" data-print-block="' + (indice + 1) + '">' +
+          cabecalho(numero, data, bloco, indice, blocos.length) +
+          tabela(estado, calculos, bloco) +
+          resumo(estado, calculos) +
+          (ultimo ? informacoesFinais(estado, data) : '') +
+          '<footer class="cot-print-footer"><span>Cotação ' + escapar(numero) + '</span><span>Bloco ' + (indice + 1) + ' de ' + blocos.length + '</span></footer>' +
+        '</article>';
     }).join('');
   }
 
   return Object.freeze({
-    renderizar: renderizar,
-    gerarHTML: renderizar,
-    dividirFornecedoresEmBlocos: function dividir(lista) { return dividirEmBlocos(lista || [], 3); }
+    dividirEmBlocos: dividirEmBlocos,
+    numeroTemporario: numeroTemporario,
+    renderizar: renderizar
   });
-}));
+});

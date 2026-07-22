@@ -2,884 +2,545 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const http = require('node:http');
-const net = require('node:net');
-const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
-const {
-  calcularCotacao,
-  formatarBasisPoints,
-  formatarCentavos,
-  formatarQuantidade,
-  normalizarCnpj,
-  parseMoedaParaCentavos,
-  parseQuantidadeParaMillesimos,
-  validarCnpj
-} = require('./public/js/cotacoes-financeiro');
-const { criarCotacoesService } = require('./lib/cotacoes-service');
-const CotacoesPrint = require('./public/js/cotacoes-print');
+
+const Financeiro = require('./public/js/cotacoes-financeiro');
+const Modelo = require('./public/js/cotacoes-modelo');
+const PrintView = require('./public/js/cotacoes-print');
 
 const RAIZ = __dirname;
 const testes = [];
-
-class TestePulado extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'TestePulado';
-  }
-}
 
 function teste(nome, executar) {
   testes.push({ nome, executar });
 }
 
-function pular(message) {
-  throw new TestePulado(message);
-}
-
-function cenarioFinanceiroObrigatorio() {
-  return {
-    itens: [
-      { id: 'item-1', descricao: 'Item 1', unidade: 'UN', quantidadeMillesimos: 1000 },
-      { id: 'item-2', descricao: 'Item 2', unidade: 'UN', quantidadeMillesimos: 1000 }
-    ],
-    fornecedores: [
-      { id: 'fornecedor-a', nome: 'Fornecedor A', freteCentavos: 0 },
-      { id: 'fornecedor-b', nome: 'Fornecedor B', freteCentavos: 0 },
-      { id: 'fornecedor-c', nome: 'Fornecedor C', freteCentavos: 0 }
-    ],
-    precos: [
-      { itemId: 'item-1', fornecedorId: 'fornecedor-a', valorUnitarioCentavos: 25000 },
-      { itemId: 'item-2', fornecedorId: 'fornecedor-a', valorUnitarioCentavos: 29000 },
-      { itemId: 'item-1', fornecedorId: 'fornecedor-b', valorUnitarioCentavos: 22000 },
-      { itemId: 'item-2', fornecedorId: 'fornecedor-b', valorUnitarioCentavos: 34500 },
-      { itemId: 'item-1', fornecedorId: 'fornecedor-c', valorUnitarioCentavos: 30000 },
-      { itemId: 'item-2', fornecedorId: 'fornecedor-c', valorUnitarioCentavos: 30500 }
-    ]
-  };
-}
-
-function entradaServicoObrigatoria() {
-  return {
-    departamento: 'Logística',
-    centroCusto: 'TESTE',
-    descricaoCompra: 'Cenário financeiro obrigatório',
-    observacoesInternas: 'Dados isolados da suíte automatizada.',
-    itens: [
-      { descricao: 'Item 1', unidade: 'UN', quantidadeMillesimos: 1000, ordem: 0 },
-      { descricao: 'Item 2', unidade: 'UN', quantidadeMillesimos: 1000, ordem: 1 }
-    ],
-    fornecedores: [
-      { nome: 'Fornecedor A', freteCentavos: 0, ordem: 0 },
-      { nome: 'Fornecedor B', freteCentavos: 0, ordem: 1 },
-      { nome: 'Fornecedor C', freteCentavos: 0, ordem: 2 }
-    ],
-    precos: [
-      { itemIndex: 0, fornecedorIndex: 0, valorUnitarioCentavos: 25000 },
-      { itemIndex: 1, fornecedorIndex: 0, valorUnitarioCentavos: 29000 },
-      { itemIndex: 0, fornecedorIndex: 1, valorUnitarioCentavos: 22000 },
-      { itemIndex: 1, fornecedorIndex: 1, valorUnitarioCentavos: 34500 },
-      { itemIndex: 0, fornecedorIndex: 2, valorUnitarioCentavos: 30000 },
-      { itemIndex: 1, fornecedorIndex: 2, valorUnitarioCentavos: 30500 }
-    ],
-    // O serviço deve ignorar qualquer derivado financeiro recebido do cliente.
-    calculos: {
-      custoIdealTotalCentavos: 1,
-      totalRecomendadoCentavos: 1,
-      descontoSugeridoCentavos: 99999999
-    },
-    totalRecomendadoCentavos: 1
-  };
-}
-
-function verificarErroServico(operacao, codigo, status) {
-  let capturado = null;
-  try {
-    operacao();
-  } catch (error) {
-    capturado = error;
-  }
-  assert.ok(capturado, `Era esperado o erro ${codigo}.`);
-  assert.equal(capturado.codigo, codigo);
-  assert.equal(capturado.status, status);
-  return capturado;
-}
-
-function validarDiretorioTemporario(diretorio) {
-  const raizTemporaria = path.resolve(os.tmpdir()).toLocaleLowerCase();
-  const alvo = path.resolve(diretorio).toLocaleLowerCase();
-  const prefixo = raizTemporaria.endsWith(path.sep)
-    ? raizTemporaria
-    : raizTemporaria + path.sep;
-  if (!alvo.startsWith(prefixo)) {
-    throw new Error('Recusa de remoção: o alvo não pertence ao diretório temporário do sistema.');
-  }
-}
-
-function removerDiretorioTemporario(diretorio) {
-  validarDiretorioTemporario(diretorio);
-  fs.rmSync(diretorio, { recursive: true, force: true });
+function ler(caminho) {
+  return fs.readFileSync(path.join(RAIZ, caminho), 'utf8');
 }
 
 function contar(texto, expressao) {
   return (texto.match(expressao) || []).length;
 }
 
-function requisicaoJson(porta, metodo, rota, corpo, token) {
-  return new Promise((resolve, reject) => {
-    const serializado = corpo === undefined ? null : JSON.stringify(corpo);
-    const headers = { Accept: 'application/json', Connection: 'close' };
-    if (serializado !== null) {
-      headers['Content-Type'] = 'application/json';
-      headers['Content-Length'] = Buffer.byteLength(serializado);
-    }
-    if (token) headers.Authorization = `Bearer ${token}`;
-
-    let concluida = false;
-    let limiteRequisicao = null;
-    const concluir = (callback, valor) => {
-      if (concluida) return;
-      concluida = true;
-      clearTimeout(limiteRequisicao);
-      callback(valor);
-    };
-    const requisicao = http.request({
-      hostname: '127.0.0.1',
-      port: porta,
-      path: rota,
-      method: metodo,
-      headers
-    }, resposta => {
-      let conteudo = '';
-      resposta.setEncoding('utf8');
-      resposta.on('data', parte => {
-        conteudo += parte;
-      });
-      resposta.on('error', error => concluir(reject, error));
-      resposta.on('end', () => {
-        let body = null;
-        if (conteudo) {
-          try {
-            body = JSON.parse(conteudo);
-          } catch {
-            body = conteudo;
-          }
-        }
-        concluir(resolve, { status: resposta.statusCode, body });
-      });
-    });
-    limiteRequisicao = setTimeout(() => {
-      requisicao.destroy(new Error('Tempo limite da requisição excedido.'));
-    }, 3000);
-    requisicao.on('error', error => concluir(reject, error));
-    if (serializado !== null) requisicao.write(serializado);
-    requisicao.end();
+function assertFuncoes(objeto, nomes, rotulo) {
+  nomes.forEach(nome => {
+    assert.equal(typeof objeto[nome], 'function', `${rotulo}.${nome} deve ser uma função.`);
   });
 }
 
-function obterPortaLivre() {
-  return new Promise((resolve, reject) => {
-    const servidor = net.createServer();
-    servidor.unref();
-    servidor.on('error', reject);
-    servidor.listen(0, '127.0.0.1', () => {
-      const endereco = servidor.address();
-      servidor.close(error => {
-        if (error) reject(error);
-        else resolve(endereco.port);
-      });
+function adicionarProduto(estado, dados) {
+  return Modelo.adicionarProduto(estado, dados);
+}
+
+function adicionarFornecedor(estado, nome, opcoes) {
+  return Modelo.adicionarFornecedor(estado, nome, opcoes);
+}
+
+function preco(estado, produtoId, fornecedorId) {
+  return estado.precos[Financeiro.chavePreco(produtoId, fornecedorId)];
+}
+
+function possuiPreco(estado, produtoId, fornecedorId) {
+  return Object.prototype.hasOwnProperty.call(
+    estado.precos,
+    Financeiro.chavePreco(produtoId, fornecedorId)
+  );
+}
+
+function resultadoFornecedor(resultado, fornecedorId) {
+  return resultado.fornecedores.find(fornecedor => fornecedor.fornecedorId === fornecedorId);
+}
+
+function resultadoProduto(resultado, produtoId) {
+  return resultado.produtos.find(produto => produto.produtoId === produtoId);
+}
+
+function entradaFinanceiraObrigatoria() {
+  const valores = {
+    a: [1000, 1000, 1000, 1500, 500, 1000, 800, 1500, 1500, 1000],
+    b: [1100, 1100, 900, 1700, 400, 1100, 700, 1400, 1700, 1200],
+    c: [900, 1200, 1100, 1600, 600, 1200, 900, 1600, 1400, 1600]
+  };
+  const produtos = Array.from({ length: 10 }, (_, indice) => ({
+    id: `produto-${indice + 1}`,
+    descricao: `Produto ${indice + 1}`,
+    quantidadeMillesimos: 5000
+  }));
+  const fornecedores = [
+    { id: 'a', nome: 'Fornecedor A' },
+    { id: 'b', nome: 'Fornecedor B' },
+    { id: 'c', nome: 'Fornecedor C' }
+  ];
+  const precos = {};
+
+  produtos.forEach((produto, indice) => {
+    fornecedores.forEach(fornecedor => {
+      precos[Financeiro.chavePreco(produto.id, fornecedor.id)] = valores[fornecedor.id][indice];
     });
   });
+
+  return { produtos, fornecedores, precos };
 }
 
-function esperar(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function aguardarServidor(processo, porta) {
-  const limite = Date.now() + 10000;
-  while (Date.now() < limite) {
-    if (processo.exitCode !== null) {
-      throw new Error(`O servidor de teste encerrou antes de iniciar (código ${processo.exitCode}).`);
-    }
-    try {
-      await requisicaoJson(porta, 'GET', '/api/cotacoes');
-      return;
-    } catch {
-      await esperar(100);
-    }
-  }
-  throw new Error('O servidor de teste não iniciou dentro de 10 segundos.');
-}
-
-function aguardarSaida(processo, limiteMs) {
-  if (!processo || processo.exitCode !== null) return Promise.resolve(true);
-  return new Promise(resolve => {
-    let finalizado = false;
-    const concluir = valor => {
-      if (finalizado) return;
-      finalizado = true;
-      clearTimeout(timer);
-      processo.removeListener('exit', aoSair);
-      resolve(valor);
-    };
-    const aoSair = () => concluir(true);
-    const timer = setTimeout(() => concluir(false), limiteMs);
-    processo.once('exit', aoSair);
-  });
-}
-
-async function encerrarServidor(processo) {
-  if (!processo || processo.exitCode !== null) return;
-  processo.kill();
-  if (await aguardarSaida(processo, 2000)) return;
-  processo.kill('SIGKILL');
-  await aguardarSaida(processo, 2000);
-}
-
-async function autenticar(porta, credencial, rotulo) {
-  const resposta = await requisicaoJson(porta, 'POST', '/api/login', {
-    usuario: credencial.usuario,
-    senha: credencial.senha
-  });
-  if (resposta.status !== 200) {
-    throw new Error(`O login da fixture ${rotulo} retornou HTTP ${resposta.status}.`);
-  }
-  if (!resposta.body || typeof resposta.body.token !== 'string' || !resposta.body.token) {
-    throw new Error(`O login da fixture ${rotulo} não retornou um token.`);
-  }
-  return resposta.body.token;
-}
-
-teste('parser, formatadores e CNPJ usam representações inteiras', () => {
-  assert.equal(parseMoedaParaCentavos('10'), 1000);
-  assert.equal(parseMoedaParaCentavos('10,5'), 1050);
-  assert.equal(parseMoedaParaCentavos('10,50'), 1050);
-  assert.equal(parseMoedaParaCentavos('1.250,75'), 125075);
-  assert.equal(parseMoedaParaCentavos('10,001'), null);
-  assert.equal(formatarCentavos(125075), 'R$ 1.250,75');
-  assert.equal(parseQuantidadeParaMillesimos('1.234,567'), 1234567);
-  assert.equal(formatarQuantidade(1234567), '1.234,567');
-  assert.equal(formatarBasisPoints(556), '5,56%');
-  assert.equal(normalizarCnpj('04.252.011/0001-10'), '04252011000110');
-  assert.equal(validarCnpj('04.252.011/0001-10'), true);
-  assert.equal(validarCnpj('11.111.111/1111-11'), false);
+teste('módulos expõem somente as operações necessárias à calculadora temporária', () => {
+  assertFuncoes(Financeiro, [
+    'calcularCotacao',
+    'parseMoedaCentavos',
+    'parseQuantidadeMillesimos',
+    'formatarMoeda',
+    'formatarQuantidade',
+    'chavePreco'
+  ], 'Financeiro');
+  assertFuncoes(Modelo, [
+    'criarEstado',
+    'adicionarProduto',
+    'duplicarProduto',
+    'removerProduto',
+    'adicionarFornecedor',
+    'renomearFornecedor',
+    'removerFornecedor',
+    'definirProduto',
+    'definirPreco',
+    'limparEstado',
+    'proximaChavePreco',
+    'calcular',
+    'podeAcessar'
+  ], 'Modelo');
+  assertFuncoes(PrintView, ['renderizar', 'dividirEmBlocos'], 'PrintView');
 });
 
-teste('cenário financeiro obrigatório produz 54000, 51000, 3000 e 556 bps', () => {
-  const entrada = cenarioFinanceiroObrigatorio();
+teste('parser e formatadores usam centavos e milésimos inteiros no padrão brasileiro', () => {
+  assert.equal(Financeiro.parseMoedaCentavos('10'), 1000);
+  assert.equal(Financeiro.parseMoedaCentavos('10,5'), 1050);
+  assert.equal(Financeiro.parseMoedaCentavos('10,50'), 1050);
+  assert.equal(Financeiro.parseMoedaCentavos('1250,75'), 125075);
+  assert.equal(Financeiro.parseMoedaCentavos('1.250,75'), 125075);
+  assert.equal(Financeiro.parseMoedaCentavos('R$ 1.234,56'), 123456);
+  assert.equal(Financeiro.parseMoedaCentavos(''), null);
+  assert.equal(Financeiro.parseMoedaCentavos('-1'), null);
+  assert.equal(Financeiro.parseMoedaCentavos(Number.NaN), null);
+  assert.equal(Financeiro.parseMoedaCentavos(Number.POSITIVE_INFINITY), null);
+  assert.equal(Financeiro.parseMoedaCentavos('10,001'), 1000, 'A terceira casa deve ser arredondada.');
+  assert.equal(Financeiro.parseMoedaCentavos('0'), 0, 'Zero é parseável, mas não é preço válido.');
+
+  assert.equal(Financeiro.parseQuantidadeMillesimos('5'), 5000);
+  assert.equal(Financeiro.parseQuantidadeMillesimos('1,5'), 1500);
+  assert.equal(Financeiro.parseQuantidadeMillesimos('1.234,567'), 1234567);
+  assert.equal(Financeiro.parseQuantidadeMillesimos('-1'), null);
+  assert.equal(Financeiro.formatarMoeda(125075), 'R$ 1.250,75');
+  assert.equal(Financeiro.formatarQuantidade(1234567), '1.234,567');
+
+  const chave = Financeiro.chavePreco('produto-1', 'fornecedor-2');
+  assert.equal(chave, Financeiro.chavePreco('produto-1', 'fornecedor-2'));
+  assert.notEqual(chave, Financeiro.chavePreco('produto-2', 'fornecedor-1'));
+});
+
+teste('produto e fornecedor criados em qualquer ordem geram todo o produto cartesiano', () => {
+  const estado = Modelo.criarEstado();
+  adicionarProduto(estado, { id: 'p1', descricao: 'Produto 1', quantidadeMillesimos: 1000 });
+  adicionarProduto(estado, { id: 'p2', descricao: 'Produto 2', quantidadeMillesimos: 2000 });
+  adicionarFornecedor(estado, 'Fornecedor A', { id: 'f1' });
+  adicionarFornecedor(estado, 'Fornecedor B', { id: 'f2' });
+
+  assert.equal(estado.produtos.length, 2);
+  assert.equal(estado.fornecedores.length, 2);
+  assert.equal(Object.keys(estado.precos).length, 4);
+  for (const produto of estado.produtos) {
+    for (const fornecedor of estado.fornecedores) {
+      assert.equal(possuiPreco(estado, produto.id, fornecedor.id), true);
+      assert.equal(preco(estado, produto.id, fornecedor.id), null);
+    }
+  }
+
+  const inverso = Modelo.criarEstado();
+  adicionarFornecedor(inverso, 'Fornecedor A', { id: 'f1' });
+  adicionarFornecedor(inverso, 'Fornecedor B', { id: 'f2' });
+  adicionarProduto(inverso, { id: 'p1', descricao: 'Produto 1', quantidadeMillesimos: 1000 });
+  adicionarProduto(inverso, { id: 'p2', descricao: 'Produto 2', quantidadeMillesimos: 2000 });
+
+  assert.deepEqual(Object.keys(inverso.precos).sort(), Object.keys(estado.precos).sort());
+});
+
+teste('editar, duplicar e remover produto preserva apenas as relações corretas', () => {
+  const estado = Modelo.criarEstado();
+  adicionarFornecedor(estado, 'Fornecedor A', { id: 'f1' });
+  adicionarFornecedor(estado, 'Fornecedor B', { id: 'f2' });
+  adicionarProduto(estado, { id: 'p1', descricao: 'Original', quantidadeMillesimos: 1000 });
+  adicionarProduto(estado, { id: 'p2', descricao: 'Permanente', quantidadeMillesimos: 1000 });
+  Modelo.definirPreco(estado, 'p1', 'f1', 1050);
+  Modelo.definirPreco(estado, 'p1', 'f2', 1200);
+  Modelo.definirPreco(estado, 'p2', 'f1', 900);
+  Modelo.definirProduto(estado, 'p1', { descricao: 'Alicate universal', quantidadeMillesimos: 2500 });
+
+  const duplicado = Modelo.duplicarProduto(estado, 'p1', { id: 'p1-copia' });
+  assert.equal(duplicado.id, 'p1-copia');
+  assert.equal(duplicado.descricao, 'Alicate universal');
+  assert.equal(duplicado.quantidadeMillesimos, 2500);
+  assert.equal(preco(estado, 'p1-copia', 'f1'), 1050);
+  assert.equal(preco(estado, 'p1-copia', 'f2'), 1200);
+  assert.equal(new Set(estado.produtos.map(produto => produto.id)).size, estado.produtos.length);
+
+  assert.equal(Modelo.removerProduto(estado, 'p1'), true);
+  assert.equal(estado.produtos.some(produto => produto.id === 'p1'), false);
+  assert.equal(possuiPreco(estado, 'p1', 'f1'), false);
+  assert.equal(possuiPreco(estado, 'p1', 'f2'), false);
+  assert.equal(preco(estado, 'p1-copia', 'f1'), 1050);
+  assert.equal(preco(estado, 'p2', 'f1'), 900);
+});
+
+teste('renomear e remover fornecedor preserva IDs e elimina somente suas combinações', () => {
+  const estado = Modelo.criarEstado();
+  adicionarProduto(estado, { id: 'p1', descricao: 'Produto 1', quantidadeMillesimos: 1000 });
+  adicionarProduto(estado, { id: 'p2', descricao: 'Produto 2', quantidadeMillesimos: 1000 });
+  adicionarFornecedor(estado, 'Fornecedor A', { id: 'f1' });
+  adicionarFornecedor(estado, 'Fornecedor B', { id: 'f2' });
+  Modelo.definirPreco(estado, 'p1', 'f1', 1000);
+  Modelo.definirPreco(estado, 'p1', 'f2', 1100);
+
+  const renomeado = Modelo.renomearFornecedor(estado, 'f1', 'Fornecedor Alfa');
+  assert.equal(renomeado.id, 'f1');
+  assert.equal(renomeado.nome, 'Fornecedor Alfa');
+  assert.equal(preco(estado, 'p1', 'f1'), 1000);
+
+  assert.equal(Modelo.removerFornecedor(estado, 'f1'), true);
+  assert.equal(estado.fornecedores.some(fornecedor => fornecedor.id === 'f1'), false);
+  assert.equal(possuiPreco(estado, 'p1', 'f1'), false);
+  assert.equal(possuiPreco(estado, 'p2', 'f1'), false);
+  assert.equal(preco(estado, 'p1', 'f2'), 1100);
+  assert.equal(possuiPreco(estado, 'p2', 'f2'), true);
+});
+
+teste('preços inválidos viram vazios, limpar descarta o estado e Enter segue ordem previsível', () => {
+  const estado = Modelo.criarEstado();
+  adicionarProduto(estado, { id: 'p1', descricao: 'Produto 1', quantidadeMillesimos: 1000 });
+  adicionarProduto(estado, { id: 'p2', descricao: 'Produto 2', quantidadeMillesimos: 1000 });
+  adicionarFornecedor(estado, 'Fornecedor A', { id: 'f1' });
+  adicionarFornecedor(estado, 'Fornecedor B', { id: 'f2' });
+
+  Modelo.definirPreco(estado, 'p1', 'f1', 1000);
+  Modelo.definirPreco(estado, 'p1', 'f2', 0);
+  Modelo.definirPreco(estado, 'p2', 'f1', -1);
+  assert.equal(preco(estado, 'p1', 'f1'), 1000);
+  assert.equal(preco(estado, 'p1', 'f2'), null);
+  assert.equal(preco(estado, 'p2', 'f1'), null);
+
+  assert.equal(
+    Modelo.proximaChavePreco(estado, 'p1', 'f1'),
+    Financeiro.chavePreco('p1', 'f2')
+  );
+  assert.equal(
+    Modelo.proximaChavePreco(estado, 'p1', 'f2'),
+    Financeiro.chavePreco('p2', 'f1')
+  );
+  assert.equal(Modelo.proximaChavePreco(estado, 'p2', 'f2'), null);
+
+  estado.impressao.numero = 'TEMP-1';
+  estado.impressao.descricao = 'Não deve sobreviver à limpeza.';
+  assert.equal(Modelo.limparEstado(estado), estado);
+  assert.deepEqual(estado.produtos, []);
+  assert.deepEqual(estado.fornecedores, []);
+  assert.deepEqual(estado.precos, {});
+  assert.deepEqual(estado.impressao, {
+    numero: '', descricao: '', elaboradoPor: '', aprovadoPor: '', data: ''
+  });
+});
+
+teste('cenário obrigatório recomenda A e calcula 54000, 51000, 3000 e 556 bps', () => {
+  const entrada = entradaFinanceiraObrigatoria();
   const antes = JSON.stringify(entrada);
-  const resultado = calcularCotacao(entrada);
+  const resultado = Financeiro.calcularCotacao(entrada);
 
   assert.equal(JSON.stringify(entrada), antes, 'O cálculo não deve alterar a entrada.');
-  assert.deepEqual(resultado.fornecedorIdsRecomendados, ['fornecedor-a']);
+  assert.equal(resultadoFornecedor(resultado, 'a').totalCentavos, 54000);
+  assert.equal(resultadoFornecedor(resultado, 'b').totalCentavos, 56500);
+  assert.equal(resultadoFornecedor(resultado, 'c').totalCentavos, 60500);
+  assert.deepEqual(resultado.fornecedoresRecomendados, ['a']);
   assert.equal(resultado.totalRecomendadoCentavos, 54000);
   assert.equal(resultado.custoIdealTotalCentavos, 51000);
   assert.equal(resultado.descontoSugeridoCentavos, 3000);
   assert.equal(resultado.percentualNegociacaoBasisPoints, 556);
-  assert.equal(resultado.contadores.fornecedoresCompletos, 3);
 });
 
-teste('empates preservam todos os menores e todos os recomendados', () => {
-  const resultado = calcularCotacao({
-    itens: [{ id: 'item', quantidadeMillesimos: 1500 }],
-    fornecedores: [{ id: 'a' }, { id: 'b' }],
-    precos: [
-      { itemId: 'item', fornecedorId: 'a', valorUnitarioCentavos: 101 },
-      { itemId: 'item', fornecedorId: 'b', valorUnitarioCentavos: 101 }
-    ]
+teste('totais usam quantidade, menor preço e empate com arredondamento financeiro exato', () => {
+  const resultado = Financeiro.calcularCotacao({
+    produtos: [{ id: 'p1', quantidadeMillesimos: 1500 }],
+    fornecedores: [{ id: 'a', nome: 'A' }, { id: 'b', nome: 'B' }],
+    precos: {
+      [Financeiro.chavePreco('p1', 'a')]: 101,
+      [Financeiro.chavePreco('p1', 'b')]: 101
+    }
   });
+  const produto = resultadoProduto(resultado, 'p1');
 
-  assert.equal(resultado.itens[0].custoIdealTotalCentavos, 152, 'Arredondamento deve ser half-up.');
-  assert.deepEqual(resultado.itens[0].fornecedorIdsMenorPreco, ['a', 'b']);
-  assert.deepEqual(resultado.fornecedorIdsRecomendados, ['a', 'b']);
-  assert.equal(resultado.itens[0].precos.every(preco => preco.menorPreco), true);
+  assert.equal(produto.porFornecedor.a.valorTotalCentavos, 152, '1,5 × R$ 1,01 arredonda para R$ 1,52.');
+  assert.equal(produto.porFornecedor.b.valorTotalCentavos, 152);
+  assert.equal(produto.menorValorUnitarioCentavos, 101);
+  assert.deepEqual(produto.fornecedoresMenorPreco, ['a', 'b']);
+  assert.equal(produto.porFornecedor.a.menorPreco, true);
+  assert.equal(produto.porFornecedor.b.menorPreco, true);
+  assert.equal(produto.custoIdealTotalCentavos, 152);
+  assert.deepEqual(resultado.fornecedoresRecomendados, ['a', 'b']);
+  assert.equal(resultado.descontoSugeridoCentavos, 0);
+  assert.equal(resultado.percentualNegociacaoBasisPoints, 0);
 });
 
-teste('fornecedor incompleto, preço indisponível e zero não são recomendados', () => {
-  const resultado = calcularCotacao({
-    itens: [
-      { id: 'i1', quantidadeMillesimos: 1000 },
-      { id: 'i2', quantidadeMillesimos: 1000 }
+teste('vazio, zero e negativo não completam proposta nem participam do menor preço', () => {
+  const entrada = {
+    produtos: [
+      { id: 'p1', quantidadeMillesimos: 1000 },
+      { id: 'p2', quantidadeMillesimos: 2000 }
     ],
-    fornecedores: [{ id: 'completo' }, { id: 'parcial' }, { id: 'indisponivel' }],
-    precos: [
-      { itemId: 'i1', fornecedorId: 'completo', valorUnitarioCentavos: 100 },
-      { itemId: 'i2', fornecedorId: 'completo', valorUnitarioCentavos: 100 },
-      { itemId: 'i1', fornecedorId: 'parcial', valorUnitarioCentavos: 1 },
-      { itemId: 'i2', fornecedorId: 'parcial', valorUnitarioCentavos: 0 },
-      { itemId: 'i1', fornecedorId: 'indisponivel', valorUnitarioCentavos: 1 },
-      { itemId: 'i2', fornecedorId: 'indisponivel', valorUnitarioCentavos: 1, indisponivel: true }
-    ]
-  });
-
-  assert.deepEqual(resultado.fornecedorIdsRecomendados, ['completo']);
-  assert.equal(resultado.fornecedores[1].completo, false);
-  assert.deepEqual(resultado.fornecedores[1].itemIdsFaltantes, ['i2']);
-  assert.equal(resultado.fornecedores[2].completo, false);
-  assert.equal(resultado.contadores.fornecedoresIncompletos, 2);
-});
-
-teste('frete altera corretamente o fornecedor recomendado', () => {
-  const resultado = calcularCotacao({
-    itens: [{ id: 'item', quantidadeMillesimos: 1000 }],
     fornecedores: [
-      { id: 'produtos-menores', freteCentavos: 200 },
-      { id: 'total-menor', freteCentavos: 0 }
+      { id: 'completo', nome: 'Completo' },
+      { id: 'parcial', nome: 'Parcial' },
+      { id: 'invalidos', nome: 'Inválidos' }
     ],
-    precos: [
-      { itemId: 'item', fornecedorId: 'produtos-menores', valorUnitarioCentavos: 100 },
-      { itemId: 'item', fornecedorId: 'total-menor', valorUnitarioCentavos: 150 }
-    ]
-  });
+    precos: {
+      [Financeiro.chavePreco('p1', 'completo')]: 100,
+      [Financeiro.chavePreco('p2', 'completo')]: 200,
+      [Financeiro.chavePreco('p1', 'parcial')]: 1,
+      [Financeiro.chavePreco('p2', 'parcial')]: null,
+      [Financeiro.chavePreco('p1', 'invalidos')]: 0,
+      [Financeiro.chavePreco('p2', 'invalidos')]: -100
+    }
+  };
+  const resultado = Financeiro.calcularCotacao(entrada);
 
-  assert.equal(resultado.custoIdealTotalCentavos, 100);
-  assert.deepEqual(resultado.fornecedorIdsRecomendados, ['total-menor']);
-  assert.equal(resultado.totalRecomendadoCentavos, 150);
+  assert.equal(resultadoFornecedor(resultado, 'completo').completo, true);
+  assert.equal(resultadoFornecedor(resultado, 'parcial').completo, false);
+  assert.equal(resultadoFornecedor(resultado, 'parcial').faltantes, 1);
+  assert.equal(resultadoFornecedor(resultado, 'invalidos').completo, false);
+  assert.equal(resultadoProduto(resultado, 'p1').fornecedoresMenorPreco.includes('invalidos'), false);
+  assert.deepEqual(resultado.fornecedoresRecomendados, ['completo']);
+
+  delete entrada.precos[Financeiro.chavePreco('p2', 'completo')];
+  const nenhumCompleto = Financeiro.calcularCotacao(entrada);
+  assert.deepEqual(nenhumCompleto.fornecedoresRecomendados, []);
+  assert.equal(nenhumCompleto.totalRecomendadoCentavos, null);
+  assert.equal(nenhumCompleto.descontoSugeridoCentavos, null);
+  assert.equal(nenhumCompleto.percentualNegociacaoBasisPoints, null);
 });
 
-teste('matriz grande mantém cálculo linear dentro do limite de desempenho', () => {
-  const quantidadeItens = 500;
-  const quantidadeFornecedores = 50;
-  const itens = Array.from({ length: quantidadeItens }, (_, indice) => ({
-    id: `item-${indice}`,
+teste('matriz 500 por 50 mantém cálculo puro dentro de limite folgado', () => {
+  const produtos = Array.from({ length: 500 }, (_, indice) => ({
+    id: `p-${indice}`,
     quantidadeMillesimos: 1000 + (indice % 3)
   }));
-  const fornecedores = Array.from({ length: quantidadeFornecedores }, (_, indice) => ({
-    id: `fornecedor-${indice}`,
-    freteCentavos: indice
+  const fornecedores = Array.from({ length: 50 }, (_, indice) => ({
+    id: `f-${indice}`,
+    nome: `Fornecedor ${indice}`
   }));
-  const precos = [];
-  for (const item of itens) {
-    for (let indice = 0; indice < quantidadeFornecedores; indice += 1) {
-      precos.push({
-        itemId: item.id,
-        fornecedorId: fornecedores[indice].id,
-        valorUnitarioCentavos: 100 + indice
-      });
-    }
-  }
+  const precos = {};
+  produtos.forEach(produto => {
+    fornecedores.forEach((fornecedor, indice) => {
+      precos[Financeiro.chavePreco(produto.id, fornecedor.id)] = 100 + indice;
+    });
+  });
 
   const inicio = performance.now();
-  const resultado = calcularCotacao({ itens, fornecedores, precos });
+  const resultado = Financeiro.calcularCotacao({ produtos, fornecedores, precos });
   const duracao = performance.now() - inicio;
 
-  assert.equal(resultado.itens.length, quantidadeItens);
-  assert.equal(resultado.itens[0].precos.length, quantidadeFornecedores);
-  assert.equal(resultado.contadores.fornecedoresCompletos, quantidadeFornecedores);
-  assert.ok(duracao < 5000, `A matriz 500x50 levou ${Math.round(duracao)} ms.`);
+  assert.equal(resultado.produtos.length, 500);
+  assert.equal(resultado.fornecedores.length, 50);
+  assert.equal(resultado.fornecedores.every(fornecedor => fornecedor.completo), true);
+  assert.ok(duracao < 5000, `A matriz 500×50 levou ${Math.round(duracao)} ms.`);
 });
 
-teste('serviço rejeita item, fornecedor, frete, data e referência inválidos', () => {
-  const diretorio = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-cotacoes-validacao-'));
-  const arquivo = path.join(diretorio, 'cotacoes.json');
-  const usuario = { usuario: 'teste-logistica', nome: 'Teste Logística' };
-  try {
-    const servico = criarCotacoesService({ arquivo });
-    verificarErroServico(() => servico.criar({
-      itens: [{ descricao: '', unidade: 'UN', quantidadeMillesimos: 1000 }],
-      fornecedores: [], precos: []
-    }, usuario), 'CAMPO_OBRIGATORIO', 400);
-    verificarErroServico(() => servico.criar({
-      itens: [{ descricao: 'Item', unidade: 'UN', quantidadeMillesimos: 0 }],
-      fornecedores: [], precos: []
-    }, usuario), 'INTEIRO_INVALIDO', 400);
-    verificarErroServico(() => servico.criar({
-      itens: [], fornecedores: [{ nome: 'Fornecedor', freteCentavos: -1 }], precos: []
-    }, usuario), 'INTEIRO_INVALIDO', 400);
-    verificarErroServico(() => servico.criar({
-      itens: [],
-      fornecedores: [{ nome: 'Mesmo nome' }, { nome: ' mesmo  nome ' }],
-      precos: []
-    }, usuario), 'FORNECEDOR_DUPLICADO', 400);
-    verificarErroServico(() => servico.criar({
-      itens: [], fornecedores: [{ nome: 'Fornecedor', validadeProposta: '2026-02-30' }], precos: []
-    }, usuario), 'DATA_INVALIDA', 400);
-    verificarErroServico(() => servico.criar({
-      itens: [{ descricao: 'Item', unidade: 'UN', quantidadeMillesimos: 1000 }],
-      fornecedores: [{ nome: 'Fornecedor' }],
-      precos: [{ itemId: 'inexistente', fornecedorIndex: 0, valorUnitarioCentavos: 100 }]
-    }, usuario), 'REFERENCIA_INVALIDA', 400);
-  } finally {
-    removerDiretorioTemporario(diretorio);
+teste('permissão atual aceita Logística, admin, todos os direitos e permissão específica', () => {
+  assert.equal(Modelo.podeAcessar({ ativo: true, cargo: 'logistica' }), true);
+  assert.equal(Modelo.podeAcessar({ ativo: true, cargo: 'admin' }), true);
+  assert.equal(Modelo.podeAcessar({
+    ativo: true,
+    cargo: 'engenheiro',
+    pode_gerenciar_permissoes: true
+  }), true);
+  assert.equal(Modelo.podeAcessar({
+    ativo: true,
+    cargo: 'vendedor',
+    pode_acessar_cotacoes: true
+  }), true);
+  assert.equal(Modelo.podeAcessar({ ativo: true, cargo: 'vendedor' }), false);
+  assert.equal(Modelo.podeAcessar({
+    ativo: false,
+    cargo: 'admin',
+    pode_gerenciar_permissoes: true,
+    pode_acessar_cotacoes: true
+  }), false);
+  assert.equal(Modelo.podeAcessar(null), false);
+});
+
+teste('impressão divide sete fornecedores em blocos de até três e repete a planilha', () => {
+  const estado = Modelo.criarEstado();
+  adicionarProduto(estado, { id: 'p1', descricao: 'Alicate <universal>', quantidadeMillesimos: 5000 });
+  adicionarProduto(estado, { id: 'p2', descricao: 'Trena 5 metros', quantidadeMillesimos: 2000 });
+  for (let indice = 1; indice <= 7; indice += 1) {
+    adicionarFornecedor(estado, `Fornecedor ${indice}`, { id: `f${indice}` });
+    Modelo.definirPreco(estado, 'p1', `f${indice}`, 900 + indice * 100);
+    Modelo.definirPreco(estado, 'p2', `f${indice}`, 500 + indice * 100);
   }
-});
-
-teste('serviço persiste, reabre, recalcula e aplica todo o ciclo de estados', () => {
-  const diretorio = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-cotacoes-service-'));
-  const arquivo = path.join(diretorio, 'dados', 'cotacoes.json');
-  const usuario = { usuario: 'teste-logistica', nome: 'Teste Logística' };
-
-  try {
-    const servico = criarCotacoesService({ arquivo });
-    const criada = servico.criar(entradaServicoObrigatoria(), usuario);
-
-    assert.equal(fs.existsSync(arquivo), true);
-    assert.match(criada.numero, /^COT-\d{4}-\d{4}$/);
-    assert.equal(criada.status, 'em_andamento');
-    assert.equal(criada.calculos.totalRecomendadoCentavos, 54000);
-    assert.equal(criada.calculos.custoIdealTotalCentavos, 51000);
-    assert.equal(criada.calculos.descontoSugeridoCentavos, 3000);
-    assert.equal(criada.calculos.percentualNegociacaoBasisPoints, 556);
-    assert.notEqual(criada.calculos.totalRecomendadoCentavos, 1);
-
-    const bancoCompactado = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
-    assert.equal(bancoCompactado.cotacoes[0].calculos.itens[0].precos, undefined);
-
-    const reaberto = criarCotacoesService({ arquivo });
-    assert.equal(reaberto.obter(criada.id).numero, criada.numero);
-    assert.equal(reaberto.obter(criada.id).calculos.itens[0].precos.length, 3);
-    assert.equal(reaberto.listar({ limite: 10 }).paginacao.total, 1);
-
-    const atualizada = reaberto.atualizar(criada.id, {
-      descricaoCompra: 'Descrição atualizada',
-      calculos: { totalRecomendadoCentavos: 7 },
-      totalRecomendadoCentavos: 7
-    }, usuario);
-    assert.equal(atualizada.descricaoCompra, 'Descrição atualizada');
-    assert.equal(atualizada.calculos.totalRecomendadoCentavos, 54000);
-
-    const duplicada = reaberto.duplicar(criada.id, usuario);
-    assert.notEqual(duplicada.id, criada.id);
-    assert.notEqual(duplicada.numero, criada.numero);
-    assert.equal(duplicada.origemDuplicacaoId, criada.id);
-    assert.equal(duplicada.calculos.totalRecomendadoCentavos, 54000);
-    assert.notEqual(duplicada.itens[0].id, criada.itens[0].id);
-    assert.notEqual(duplicada.fornecedores[0].id, criada.fornecedores[0].id);
-
-    const finalizada = reaberto.finalizar(criada.id, usuario);
-    assert.equal(finalizada.status, 'finalizada');
-    assert.ok(finalizada.finalizadaEm);
-    verificarErroServico(
-      () => reaberto.atualizar(criada.id, { descricaoCompra: 'Não permitido' }, usuario),
-      'COTACAO_SOMENTE_LEITURA',
-      409
-    );
-    verificarErroServico(
-      () => reaberto.cancelar(criada.id, { motivo: 'Não permitido' }, usuario),
-      'COTACAO_SOMENTE_LEITURA',
-      409
-    );
-    verificarErroServico(
-      () => reaberto.excluir(criada.id),
-      'EXCLUSAO_NAO_PERMITIDA',
-      409
-    );
-    verificarErroServico(
-      () => reaberto.finalizar(criada.id, usuario),
-      'FINALIZACAO_NAO_PERMITIDA',
-      409
-    );
-
-    const cancelada = reaberto.cancelar(duplicada.id, { motivo: 'Teste de regra' }, usuario);
-    assert.equal(cancelada.status, 'cancelada');
-    assert.equal(cancelada.cancelamento.motivo, 'Teste de regra');
-    verificarErroServico(
-      () => reaberto.cancelar(duplicada.id, {}, usuario),
-      'COTACAO_JA_CANCELADA',
-      409
-    );
-    verificarErroServico(
-      () => reaberto.excluir(duplicada.id),
-      'EXCLUSAO_NAO_PERMITIDA',
-      409
-    );
-    verificarErroServico(
-      () => reaberto.atualizar(duplicada.id, { descricaoCompra: 'Não permitido' }, usuario),
-      'COTACAO_SOMENTE_LEITURA',
-      409
-    );
-    verificarErroServico(
-      () => reaberto.finalizar(duplicada.id, usuario),
-      'FINALIZACAO_NAO_PERMITIDA',
-      409
-    );
-
-    const incompleta = reaberto.criar({
-      descricaoCompra: 'Incompleta',
-      itens: [
-        { descricao: 'Item 1', unidade: 'UN', quantidadeMillesimos: 1000 },
-        { descricao: 'Item 2', unidade: 'UN', quantidadeMillesimos: 1000 }
-      ],
-      fornecedores: [{ nome: 'Fornecedor único', freteCentavos: 0 }],
-      precos: [{ itemIndex: 0, fornecedorIndex: 0, valorUnitarioCentavos: 100 }]
-    }, usuario);
-    verificarErroServico(
-      () => reaberto.finalizar(incompleta.id, usuario),
-      'COTACAO_INCOMPLETA',
-      422
-    );
-    reaberto.excluir(incompleta.id);
-    verificarErroServico(
-      () => reaberto.obter(incompleta.id),
-      'COTACAO_NAO_ENCONTRADA',
-      404
-    );
-
-    const deletavel = reaberto.criar({
-      descricaoCompra: 'Rascunho deletável',
-      itens: [],
-      fornecedores: [],
-      precos: []
-    }, usuario);
-    reaberto.excluir(deletavel.id);
-    verificarErroServico(
-      () => reaberto.obter(deletavel.id),
-      'COTACAO_NAO_ENCONTRADA',
-      404
-    );
-
-    const bancoPersistido = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
-    assert.equal(bancoPersistido.cotacoes.length, 2);
-    assert.deepEqual(
-      bancoPersistido.cotacoes.map(cotacao => cotacao.status).sort(),
-      ['cancelada', 'finalizada']
-    );
-  } finally {
-    removerDiretorioTemporario(diretorio);
-  }
-
-  assert.equal(fs.existsSync(diretorio), false);
-});
-
-teste('histórico filtra pelo dia civil de São Paulo, não por UTC', () => {
-  const diretorio = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-cotacoes-data-'));
-  const arquivo = path.join(diretorio, 'cotacoes.json');
-  try {
-    const servico = criarCotacoesService({ arquivo });
-    const criada = servico.criar({ itens: [], fornecedores: [], precos: [] }, {
-      usuario: 'teste-logistica',
-      nome: 'Teste Logística'
-    });
-    const banco = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
-    banco.cotacoes.find(cotacao => cotacao.id === criada.id).criadoEm = '2026-07-23T01:30:00.000Z';
-    fs.writeFileSync(arquivo, JSON.stringify(banco, null, 2), 'utf8');
-
-    assert.equal(servico.listar({ dataInicio: '2026-07-22', dataFim: '2026-07-22' }).paginacao.total, 1);
-    assert.equal(servico.listar({ dataInicio: '2026-07-23', dataFim: '2026-07-23' }).paginacao.total, 0);
-  } finally {
-    removerDiretorioTemporario(diretorio);
-  }
-});
-
-teste('renderizador CommonJS divide sete fornecedores em blocos de no máximo três', () => {
-  const fornecedores = Array.from({ length: 7 }, (_, indice) => ({
-    id: `fornecedor-${indice + 1}`,
-    nome: `Fornecedor ${indice + 1}`,
-    freteCentavos: indice * 10,
-    ativoComparacao: true
-  }));
-  const cotacao = {
-    numero: 'COT-TESTE-0001',
-    status: 'em_andamento',
-    criadoEm: '2026-01-01T12:00:00.000Z',
-    departamento: 'Logística',
-    descricaoCompra: 'Teste de impressão com sete fornecedores.',
-    observacoesInternas: 'OBSERVACAO_INTERNA_TESTE',
-    itens: [{
-      id: 'item-1',
-      descricao: 'Item de impressão',
-      observacao: 'OBSERVACAO_ITEM_TESTE',
-      unidade: 'UN',
-      quantidadeMillesimos: 1000,
-      ativo: true
-    }],
-    fornecedores,
-    precos: fornecedores.map((fornecedor, indice) => ({
-      itemId: 'item-1',
-      fornecedorId: fornecedor.id,
-      valorUnitarioCentavos: 1000 + indice,
-      indisponivel: false
-    }))
+  estado.impressao = {
+    numero: '210726',
+    descricao: 'Reposição <urgente> do estoque',
+    elaboradoPor: 'Daniela',
+    aprovadoPor: 'Responsável',
+    data: '2026-07-22'
   };
 
-  const blocos = CotacoesPrint.dividirFornecedoresEmBlocos(fornecedores);
+  const blocos = PrintView.dividirEmBlocos(estado.fornecedores);
   assert.deepEqual(blocos.map(bloco => bloco.length), [3, 3, 1]);
 
-  const html = CotacoesPrint.renderizar(cotacao, {
-    emitidoEm: '2026-01-02T12:00:00.000Z',
-    incluirObservacoes: true,
-    incluirAssinaturas: true
-  });
-  const folhas = html.split('<article class="cot-print-sheet"').slice(1);
-
+  const html = PrintView.renderizar(estado, { emitidoEm: '2026-07-22T12:00:00.000Z' });
+  const folhas = html.split(/<article\b[^>]*class="[^"]*cot-print-sheet[^"]*"[^>]*>/i).slice(1);
   assert.equal(folhas.length, 3);
   assert.equal(contar(html, /data-print-block="\d+"/g), 3);
-  assert.deepEqual(
-    folhas.map(folha => contar(folha, /<article class="cot-print-supplier(?: recommended)?">/g)),
-    [3, 3, 1]
-  );
-  assert.equal(folhas.every(folha =>
-    contar(folha, /<article class="cot-print-supplier(?: recommended)?">/g) <= 3
-  ), true);
 
-  const htmlSelecionado = CotacoesPrint.renderizar(cotacao, {
-    fornecedorIds: ['fornecedor-7'],
-    incluirObservacoes: false,
-    incluirAssinaturas: false,
-    emitidoEm: '2026-01-02T12:00:00.000Z'
+  const quantidadesFornecedores = folhas.map(folha => {
+    const cabecalho = folha.match(/<thead\b[^>]*>[\s\S]*?<\/thead>/i);
+    assert.ok(cabecalho, 'Cada bloco deve possuir cabeçalho próprio.');
+    const nomes = cabecalho[0].match(/Fornecedor\s+[1-7]/gi) || [];
+    return new Set(nomes.map(nome => nome.toLocaleLowerCase())).size;
   });
-  assert.match(htmlSelecionado, /Fornecedor 7 · RECOMENDADO/);
-  assert.doesNotMatch(htmlSelecionado, /Fornecedor 1/);
-  assert.match(htmlSelecionado, /Resumo da compra/);
-  assert.match(htmlSelecionado, /Teste de impressão com sete fornecedores\./);
-  assert.doesNotMatch(htmlSelecionado, /OBSERVACAO_INTERNA_TESTE/);
-  assert.doesNotMatch(htmlSelecionado, /OBSERVACAO_ITEM_TESTE/);
+  assert.deepEqual(quantidadesFornecedores, [3, 3, 1]);
+  folhas.forEach(folha => {
+    assert.match(folha, /210726/);
+    assert.match(folha, /PRODUTO/i);
+    assert.match(folha, /QUANTIDADE/i);
+    assert.match(folha, /CUSTO IDEAL/i);
+  });
+
+  assert.match(html, /Cotação de Preços/i);
+  assert.match(html, /Fornecedor recomendado/i);
+  assert.match(html, /Desconto sugerido/i);
+  assert.match(html, /Percentual de negociação/i);
+  assert.match(html, /best-price|data-best="true"/i);
+  assert.match(html, /Alicate &lt;universal&gt;/);
+  assert.match(html, /Reposição &lt;urgente&gt; do estoque/);
+  assert.doesNotMatch(html, /<input\b|<button\b|<textarea\b/i);
+  assert.doesNotMatch(html, /RAZÃO SOCIAL|CNPJ|FORMA (?:DE )?PGTO|PRAZO DE ENTREGA|FRETE|TELEFONE|E-?MAIL/i);
 });
 
-teste('contrato estático integra menu, permissão configurável, guards, IDs e scripts', () => {
-  const html = fs.readFileSync(path.join(RAIZ, 'public', 'funcionario.html'), 'utf8');
-  const navegacao = fs.readFileSync(path.join(RAIZ, 'public', 'js', 'funcionario.js'), 'utf8');
-  const frontend = fs.readFileSync(path.join(RAIZ, 'public', 'js', 'cotacoes.js'), 'utf8');
-  const css = fs.readFileSync(path.join(RAIZ, 'public', 'css', 'cotacoes.css'), 'utf8');
-  const permissoesHtml = fs.readFileSync(path.join(RAIZ, 'public', 'permissoes.html'), 'utf8');
-  const permissoesJs = fs.readFileSync(path.join(RAIZ, 'public', 'js', 'permissoes.js'), 'utf8');
-  const usuarios = JSON.parse(fs.readFileSync(path.join(RAIZ, 'data', 'usuarios.json'), 'utf8'));
+teste('contrato estático mantém planilha compacta, impressão, temas e quatro ações principais', () => {
+  const html = ler('public/funcionario.html');
+  const inicioTela = html.indexOf('<section id="tela-cotacoes"');
+  const fimTela = html.indexOf('<!-- TELA 9', inicioTela);
+  const tela = html.slice(inicioTela, fimTela > inicioTela ? fimTela : undefined);
+  const frontend = ler('public/js/cotacoes.js');
+  const modelo = ler('public/js/cotacoes-modelo.js');
+  const css = ler('public/css/cotacoes.css');
+  const servidor = ler('server.js');
+  const navegacao = ler('public/js/funcionario.js');
+  const permissoesHtml = ler('public/permissoes.html');
+  const permissoesJs = ler('public/js/permissoes.js');
 
+  assert.ok(inicioTela >= 0, 'A tela de cotações deve existir.');
   assert.match(html, /id="menu-cotacoes"[^>]*\shidden/);
-  assert.match(navegacao, /cargo === 'logistica'/);
-  assert.match(navegacao, /usuario\.pode_gerenciar_permissoes === true/);
-  assert.match(navegacao, /usuario\.pode_acessar_cotacoes === true/);
-  assert.match(frontend, /window\.podeAcessarModuloCotacoes/);
-  assert.ok(frontend.indexOf('if (!autorizarOuNegar())') < frontend.indexOf('window.fetch('));
-  assert.ok(html.indexOf('js/cotacoes-financeiro.js') < html.indexOf('js/cotacoes-print.js'));
-  assert.ok(html.indexOf('js/cotacoes-print.js') < html.indexOf('js/cotacoes.js'));
-  assert.match(css, /@page cotacoes-documento\s*\{\s*size:\s*A4 landscape;/);
+
+  const idsObrigatorios = [
+    'cotacoes-acesso-negado', 'cotacoes-app', 'cotacoes-titulo',
+    'cotacoes-adicionar-item', 'cotacoes-adicionar-fornecedor', 'cotacoes-imprimir',
+    'cotacoes-limpar', 'cotacoes-sheet-status', 'cotacoes-tabela-wrap', 'cotacoes-resumo',
+    'cotacao-numero', 'cotacao-descricao', 'cotacao-elaborado-por',
+    'cotacao-aprovado-por', 'cotacao-data', 'cotacoes-print-preview',
+    'cotacoes-print-title', 'cotacoes-print-executar', 'cotacoes-print-fechar',
+    'cotacoes-print-document'
+  ];
+  idsObrigatorios.forEach(id => assert.match(tela, new RegExp(`id="${id}"`)));
+
+  const toolbar = tela.match(/<div class="cotacoes-toolbar"[\s\S]*?<\/div>/);
+  assert.ok(toolbar, 'A barra de ações principal deve existir.');
+  assert.equal(contar(toolbar[0], /<button\b/g), 4);
+  assert.match(toolbar[0], /\+ Adicionar Produto/);
+  assert.match(toolbar[0], /\+ Adicionar Fornecedor/);
+  assert.match(toolbar[0], />Imprimir</);
+  assert.match(toolbar[0], />Limpar Tabela</);
+
+  for (const id of [
+    'cotacoes-salvar', 'cotacoes-finalizar', 'cotacoes-historico',
+    'cotacoes-cancelar', 'cotacoes-aprovar', 'cotacoes-reabrir'
+  ]) {
+    assert.doesNotMatch(tela, new RegExp(`id="${id}"`));
+  }
+
+  const scripts = [
+    'js/cotacoes-financeiro.js',
+    'js/cotacoes-modelo.js',
+    'js/cotacoes-print.js',
+    'js/cotacoes.js'
+  ];
+  scripts.forEach(script => assert.match(html, new RegExp(`src="${script.replace(/\./g, '\\.')}`)));
+  assert.ok(html.indexOf(scripts[0]) < html.indexOf(scripts[1]));
+  assert.ok(html.indexOf(scripts[1]) < html.indexOf(scripts[3]));
+  assert.ok(html.indexOf(scripts[2]) < html.indexOf(scripts[3]));
+
+  assert.match(frontend, /data-(?:item|produto)-id/);
+  assert.match(frontend, /data-(?:supplier|fornecedor)-id|data-price-supplier/);
+  assert.match(frontend, /data-preco-chave/);
+  assert.match(frontend, /data-produto-id/);
+  assert.match(frontend, /data-fornecedor-id/);
+  assert.match(frontend, /(?:evento|event)\.key\s*[!=]===?\s*['"]Enter['"]/);
+  assert.doesNotMatch(frontend, /(?:evento|event)\.key\s*===?\s*['"]Tab['"]/);
+  assert.match(frontend, /window\.print\s*\(/);
+  assert.match(frontend, /PrintView\.renderizar|CotacoesPrintView\.renderizar/);
+  assert.match(frontend, /confirm\s*\(/);
+
+  assert.match(css, /\.cotacoes-sheet-wrap\s*\{[^}]*overflow\s*:\s*(?:auto|[^;}]*horizontal)/s);
+  assert.match(css, /\.cotacoes-sheet-table[\s\S]*position\s*:\s*sticky/);
+  for (const classe of [
+    'cotacoes-col-number', 'cotacoes-col-item', 'cotacoes-col-quantity',
+    'cotacoes-col-supplier', 'cotacoes-col-ideal', 'cotacoes-totals-row',
+    'cotacoes-summary-strip', 'cotacoes-print-fields', 'cot-print-sheet', 'cot-print-table'
+  ]) {
+    assert.match(css, new RegExp(`\\.${classe}\\b`));
+  }
+  assert.match(css, /\.cotacoes-price-cell\[data-best=(?:"?true"?)\]/);
+  assert.match(css, /(?:prefers-color-scheme\s*:\s*light|data-theme[^\n{]*light|color-scheme\s*:[^;]*light)/i);
+  assert.match(css, /(?:prefers-color-scheme\s*:\s*dark|data-theme[^\n{]*dark|--cot-bg\s*:\s*#[0-2])/i);
+  assert.match(css, /@page(?:\s+[\w-]+)?\s*\{[^}]*size\s*:\s*A4 landscape[^}]*margin\s*:\s*8mm/is);
+  assert.match(css, /@media\s+print/i);
+  assert.match(css, /print-color-adjust\s*:\s*exact/i);
+  assert.match(css, /-webkit-print-color-adjust\s*:\s*exact/i);
+  assert.doesNotMatch(css, /(?:linear|radial)-gradient\s*\(/i);
+
+  assert.doesNotMatch(frontend, /\/api\/cotacoes|\bfetch\s*\(|localStorage|sessionStorage|autosave/i);
+  assert.doesNotMatch(modelo, /\/api\/cotacoes|\bfetch\s*\(|localStorage|sessionStorage|autosave/i);
+  assert.doesNotMatch(servidor, /\/api\/cotacoes|cotacoes-service|COTACOES_PATH/);
+  assert.equal(fs.existsSync(path.join(RAIZ, 'lib', 'cotacoes-service.js')), false);
+  assert.equal(fs.existsSync(path.join(RAIZ, 'data', 'cotacoes.json')), false);
+
+  assert.match(navegacao, /podeAcessarModuloCotacoes|CotacoesModelo\.podeAcessar/);
+  assert.match(navegacao, /tela\s*===\s*['"]cotacoes['"]/);
   assert.match(permissoesHtml, /id="perm-cotacoes"/);
   assert.match(permissoesJs, /pode_acessar_cotacoes/);
 
-  for (const login of ['admin', 'felipe', 'kelvin', 'daniela']) {
-    assert.equal(usuarios[login] && usuarios[login].pode_acessar_cotacoes, true, `${login} deve acessar cotações`);
-  }
-  assert.equal(usuarios.miqueias && usuarios.miqueias.pode_acessar_cotacoes, false);
-
   const idsHtml = new Set(Array.from(html.matchAll(/\sid="([^"]+)"/g), resultado => resultado[1]));
-  const idsReferenciados = Array.from(frontend.matchAll(/porId\('([^']+)'\)/g), resultado => resultado[1]);
-  const ausentes = Array.from(new Set(idsReferenciados.filter(id => !idsHtml.has(id))));
-  assert.deepEqual(ausentes, []);
-});
-
-teste('API real aplica 401/403 e aceita Logística, admin, todos os direitos e permissão específica', async () => {
-  const diretorio = fs.mkdtempSync(path.join(os.tmpdir(), 'razor-cotacoes-http-'));
-  const arquivoCotacoes = path.join(diretorio, 'cotacoes-http.json');
-  const usuariosPath = path.join(diretorio, 'usuarios-http.json');
-  const usuarios = {
-    logistica: {
-      senha: 'teste-logistica', nome: 'Teste Logística', cargo: 'logistica', ativo: true,
-      pode_ver_funcionario: true, pode_ver_imagens: true, pode_editar_imagens: false,
-      pode_gerenciar_permissoes: false, pode_acessar_cotacoes: false
-    },
-    admin: {
-      senha: 'teste-admin', nome: 'Teste Admin', cargo: 'admin', ativo: true,
-      pode_ver_funcionario: true, pode_ver_imagens: true, pode_editar_imagens: true,
-      pode_gerenciar_permissoes: false, pode_acessar_cotacoes: false
-    },
-    felipe: {
-      senha: 'teste-felipe', nome: 'Teste Todos os Direitos', cargo: 'engenheiro', ativo: true,
-      pode_ver_funcionario: true, pode_ver_imagens: true, pode_editar_imagens: true,
-      pode_gerenciar_permissoes: true, pode_acessar_cotacoes: false
-    },
-    daniela: {
-      senha: 'teste-daniela', nome: 'Teste Permissão Específica', cargo: 'vendedor', ativo: true,
-      pode_ver_funcionario: true, pode_ver_imagens: true, pode_editar_imagens: false,
-      pode_gerenciar_permissoes: false, pode_acessar_cotacoes: true
-    },
-    sem_permissao: {
-      senha: 'teste-sem-permissao', nome: 'Teste Sem Permissão', cargo: 'vendedor', ativo: true,
-      pode_ver_funcionario: true, pode_ver_imagens: true, pode_editar_imagens: false,
-      pode_gerenciar_permissoes: false, pode_acessar_cotacoes: false
-    }
-  };
-  const usuariosConteudoOriginal = JSON.stringify(usuarios, null, 2);
-  fs.writeFileSync(usuariosPath, usuariosConteudoOriginal, 'utf8');
-  let porta = null;
-  let processo = null;
-
-  try {
-    porta = await obterPortaLivre();
-    processo = spawn(process.execPath, ['server.js'], {
-      cwd: RAIZ,
-      env: {
-        ...process.env,
-        PORT: String(porta),
-        COTACOES_PATH: arquivoCotacoes,
-        USUARIOS_PATH: usuariosPath
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true
-    });
-    processo.stdout.resume();
-    processo.stderr.resume();
-    await aguardarServidor(processo, porta);
-
-    const semToken = await requisicaoJson(porta, 'GET', '/api/cotacoes');
-    assert.equal(semToken.status, 401);
-    const semTokenPost = await requisicaoJson(porta, 'POST', '/api/cotacoes', entradaServicoObrigatoria());
-    assert.equal(semTokenPost.status, 401);
-
-    const tokenSemPermissao = await autenticar(
-      porta, { usuario: 'sem_permissao', senha: usuarios.sem_permissao.senha }, 'sem permissão'
-    );
-    const proibida = await requisicaoJson(porta, 'GET', '/api/cotacoes', undefined, tokenSemPermissao);
-    assert.equal(proibida.status, 403);
-    assert.equal(proibida.body && proibida.body.codigo, 'PERMISSAO_COTACOES_OBRIGATORIA');
-    const proibidaPost = await requisicaoJson(
-      porta, 'POST', '/api/cotacoes', entradaServicoObrigatoria(), tokenSemPermissao
-    );
-    assert.equal(proibidaPost.status, 403);
-
-    const tokensAutorizados = {};
-    for (const login of ['logistica', 'admin', 'felipe', 'daniela']) {
-      tokensAutorizados[login] = await autenticar(
-        porta, { usuario: login, senha: usuarios[login].senha }, login
-      );
-      const permitida = await requisicaoJson(porta, 'GET', '/api/cotacoes', undefined, tokensAutorizados[login]);
-      assert.equal(permitida.status, 200, `${login} deveria acessar cotações`);
-    }
-
-    const usuariosGerenciados = await requisicaoJson(
-      porta, 'GET', '/api/usuarios', undefined, tokensAutorizados.felipe
-    );
-    assert.equal(usuariosGerenciados.status, 200);
-    assert.equal(usuariosGerenciados.body.daniela.pode_acessar_cotacoes, true);
-
-    const concedida = await requisicaoJson(
-      porta, 'PUT', '/api/usuarios/sem_permissao', {
-        permissoes: {
-          pode_ver_funcionario: true,
-          pode_ver_imagens: true,
-          pode_editar_imagens: false,
-          pode_gerenciar_permissoes: false,
-          pode_acessar_cotacoes: true
-        }
-      }, tokensAutorizados.felipe
-    );
-    assert.equal(concedida.status, 200);
-    assert.equal((await requisicaoJson(porta, 'GET', '/api/cotacoes', undefined, tokenSemPermissao)).status, 200);
-
-    const revogada = await requisicaoJson(
-      porta, 'PUT', '/api/usuarios/sem_permissao', {
-        permissoes: {
-          pode_ver_funcionario: true,
-          pode_ver_imagens: true,
-          pode_editar_imagens: false,
-          pode_gerenciar_permissoes: false,
-          pode_acessar_cotacoes: false
-        }
-      }, tokensAutorizados.felipe
-    );
-    assert.equal(revogada.status, 200);
-    assert.equal((await requisicaoJson(porta, 'GET', '/api/cotacoes', undefined, tokenSemPermissao)).status, 403);
-
-    const tokenLogistica = tokensAutorizados.logistica;
-    const criada = await requisicaoJson(
-      porta,
-      'POST',
-      '/api/cotacoes',
-      entradaServicoObrigatoria(),
-      tokenLogistica
-    );
-    assert.equal(criada.status, 201);
-    assert.equal(criada.body && criada.body.success, true);
-    assert.equal(criada.body.cotacao.status, 'em_andamento');
-    assert.equal(criada.body.cotacao.calculos.totalRecomendadoCentavos, 54000);
-    assert.equal(criada.body.cotacao.calculos.custoIdealTotalCentavos, 51000);
-    assert.equal(criada.body.cotacao.calculos.descontoSugeridoCentavos, 3000);
-    assert.equal(criada.body.cotacao.calculos.percentualNegociacaoBasisPoints, 556);
-
-    const listagem = await requisicaoJson(porta, 'GET', '/api/cotacoes', undefined, tokenLogistica);
-    assert.equal(listagem.status, 200);
-    assert.equal(listagem.body.paginacao.total, 1);
-
-    const impressao = await requisicaoJson(
-      porta,
-      'GET',
-      `/api/cotacoes/${encodeURIComponent(criada.body.cotacao.id)}/impressao`,
-      undefined,
-      tokenLogistica
-    );
-    assert.equal(impressao.status, 200);
-    assert.equal(impressao.body.cotacao.numero, criada.body.cotacao.numero);
-
-    const atualizada = await requisicaoJson(
-      porta, 'PUT', `/api/cotacoes/${encodeURIComponent(criada.body.cotacao.id)}`,
-      { descricaoCompra: 'Atualizada pela integração HTTP' }, tokenLogistica
-    );
-    assert.equal(atualizada.status, 200);
-    assert.equal(atualizada.body.cotacao.descricaoCompra, 'Atualizada pela integração HTTP');
-
-    const duplicada = await requisicaoJson(
-      porta, 'POST', `/api/cotacoes/${encodeURIComponent(criada.body.cotacao.id)}/duplicar`, {}, tokenLogistica
-    );
-    assert.equal(duplicada.status, 201);
-
-    const finalizada = await requisicaoJson(
-      porta, 'POST', `/api/cotacoes/${encodeURIComponent(criada.body.cotacao.id)}/finalizar`, {}, tokenLogistica
-    );
-    assert.equal(finalizada.status, 200);
-    assert.equal(finalizada.body.cotacao.status, 'finalizada');
-    const edicaoBloqueada = await requisicaoJson(
-      porta, 'PUT', `/api/cotacoes/${encodeURIComponent(criada.body.cotacao.id)}`,
-      { descricaoCompra: 'Não deve alterar' }, tokenLogistica
-    );
-    assert.equal(edicaoBloqueada.status, 409);
-
-    const cancelada = await requisicaoJson(
-      porta, 'POST', `/api/cotacoes/${encodeURIComponent(duplicada.body.cotacao.id)}/cancelar`,
-      { motivo: 'Teste HTTP' }, tokenLogistica
-    );
-    assert.equal(cancelada.status, 200);
-    assert.equal(cancelada.body.cotacao.status, 'cancelada');
-
-    const rascunho = await requisicaoJson(
-      porta, 'POST', '/api/cotacoes', { descricaoCompra: 'Excluir', itens: [], fornecedores: [], precos: [] }, tokenLogistica
-    );
-    assert.equal(rascunho.status, 201);
-    const excluida = await requisicaoJson(
-      porta, 'DELETE', `/api/cotacoes/${encodeURIComponent(rascunho.body.cotacao.id)}`, undefined, tokenLogistica
-    );
-    assert.equal(excluida.status, 200);
-
-    const bancoIsolado = JSON.parse(fs.readFileSync(arquivoCotacoes, 'utf8'));
-    assert.equal(bancoIsolado.cotacoes.length, 2);
-    assert.deepEqual(bancoIsolado.cotacoes.map(cotacao => cotacao.status).sort(), ['cancelada', 'finalizada']);
-    assert.equal(JSON.parse(fs.readFileSync(usuariosPath, 'utf8')).sem_permissao.pode_acessar_cotacoes, false);
-  } finally {
-    await encerrarServidor(processo);
-    removerDiretorioTemporario(diretorio);
-  }
-
-  assert.equal(fs.existsSync(diretorio), false);
+  const idsReferenciados = [
+    ...Array.from(frontend.matchAll(/(?:porId|document\.getElementById)\(['"]([^'"]+)['"]\)/g), resultado => resultado[1])
+  ];
+  const idsAusentes = Array.from(new Set(idsReferenciados.filter(id => !idsHtml.has(id))));
+  assert.deepEqual(idsAusentes, []);
 });
 
 async function executarSuite() {
   let falhas = 0;
-  let pulados = 0;
   const inicioSuite = performance.now();
 
   for (const caso of testes) {
     const inicio = performance.now();
     try {
       await caso.executar();
-      const duracao = Math.round(performance.now() - inicio);
-      console.log(`✓ ${caso.nome} (${duracao} ms)`);
+      console.log(`✓ ${caso.nome} (${Math.round(performance.now() - inicio)} ms)`);
     } catch (error) {
-      if (error instanceof TestePulado) {
-        pulados += 1;
-        console.log(`- ${caso.nome} [PULADO: ${error.message}]`);
-      } else {
-        falhas += 1;
-        console.error(`✗ ${caso.nome}`);
-        console.error(error && error.stack ? error.stack : error);
-      }
+      falhas += 1;
+      console.error(`✗ ${caso.nome}`);
+      console.error(error && error.stack ? error.stack : error);
     }
   }
 
-  const duracaoTotal = Math.round(performance.now() - inicioSuite);
-  const aprovados = testes.length - falhas - pulados;
-  console.log(`\nCotações: ${aprovados} aprovados, ${falhas} falhas, ${pulados} pulados (${duracaoTotal} ms).`);
+  const duracao = Math.round(performance.now() - inicioSuite);
+  console.log(`\nCotações temporárias: ${testes.length - falhas} aprovados, ${falhas} falhas (${duracao} ms).`);
   if (falhas > 0) process.exitCode = 1;
 }
 

@@ -4,26 +4,18 @@ const path = require('path');
 const cors = require('cors');
 const busboy = require('busboy');
 const cookieParser = require('cookie-parser');
-const {
-  CotacoesServiceError,
-  criarCotacoesService
-} = require('./lib/cotacoes-service');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const IMAGES_PATH = process.env.IMAGES_PATH || 'rede';
 const USUARIOS_PATH = process.env.USUARIOS_PATH || path.join(__dirname, 'data', 'usuarios.json');
-const COTACOES_PATH = process.env.COTACOES_PATH || path.join(__dirname, 'data', 'cotacoes.json');
-const cotacoesService = criarCotacoesService({ arquivo: COTACOES_PATH });
 
 // Sessões em memória
 const sessions = new Map();
 
 app.use(cors());
 app.use(cookieParser());
-// Autoriza antes de aceitar o corpo ampliado exigido por matrizes grandes.
-app.use('/api/cotacoes', authenticate, requireAcessoCotacoes, express.json({ limit: '16mb' }));
 app.use(express.json());
 app.use(express.static('public'));
 
@@ -81,43 +73,6 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Acesso negado' });
   }
   next();
-}
-
-// Acesso a cotações: Logística, administradores/todos os direitos ou quem
-// recebeu a permissão específica. O usuário é relido da fonte persistente em
-// toda requisição para não confiar no snapshot da sessão nem no navegador.
-function usuarioPodeAcessarCotacoes(usuario) {
-  return Boolean(usuario && usuario.ativo === true && (
-    usuario.cargo === 'logistica' ||
-    usuario.cargo === 'admin' ||
-    usuario.pode_gerenciar_permissoes === true ||
-    usuario.pode_acessar_cotacoes === true
-  ));
-}
-
-function requireAcessoCotacoes(req, res, next) {
-  try {
-    const usuarios = JSON.parse(fs.readFileSync(USUARIOS_PATH, 'utf8'));
-    const login = req.user && req.user.usuario;
-    const existe = login && Object.prototype.hasOwnProperty.call(usuarios, login);
-    const usuarioAtual = existe ? usuarios[login] : null;
-
-    if (!usuarioPodeAcessarCotacoes(usuarioAtual)) {
-      return res.status(403).json({
-        error: 'Acesso negado. É necessária a permissão de Cotação de Preços.',
-        codigo: 'PERMISSAO_COTACOES_OBRIGATORIA'
-      });
-    }
-
-    req.cotacoesUser = { ...usuarioAtual, usuario: login };
-    next();
-  } catch (error) {
-    console.error('Erro ao validar acesso a cotações:', error.message);
-    res.status(500).json({
-      error: 'Não foi possível validar a permissão de acesso.',
-      codigo: 'ERRO_AO_VALIDAR_PERMISSAO'
-    });
-  }
 }
 
 // Login
@@ -855,107 +810,6 @@ app.put('/api/configuracoes', authenticate, (req, res) => {
   res.json({ success: true });
 });
 
-// ═══════════════════════════════════════════════════════════
-// COTAÇÃO DE PREÇOS — ACESSO EXCLUSIVO DE LOGÍSTICA
-// ═══════════════════════════════════════════════════════════
-function responderErroCotacoes(res, error) {
-  if (error instanceof CotacoesServiceError) {
-    const resposta = {
-      error: error.message,
-      codigo: error.codigo
-    };
-    if (error.detalhes !== undefined) resposta.detalhes = error.detalhes;
-    return res.status(error.status).json(resposta);
-  }
-
-  console.error('Erro inesperado no módulo de cotações:', error);
-  return res.status(500).json({
-    error: 'Erro interno ao processar a cotação.',
-    codigo: 'ERRO_INTERNO'
-  });
-}
-
-function rotaCotacoes(handler) {
-  return (req, res) => {
-    try {
-      handler(req, res);
-    } catch (error) {
-      responderErroCotacoes(res, error);
-    }
-  };
-}
-
-app.get('/api/cotacoes', rotaCotacoes((req, res) => {
-  res.json(cotacoesService.listar(req.query));
-}));
-
-app.post('/api/cotacoes', rotaCotacoes((req, res) => {
-  const cotacao = cotacoesService.criar(req.body, req.cotacoesUser);
-  res.status(201).json({ success: true, cotacao });
-}));
-
-app.get('/api/cotacoes/:id', rotaCotacoes((req, res) => {
-  res.json({ cotacao: cotacoesService.obter(req.params.id) });
-}));
-
-app.put('/api/cotacoes/:id', rotaCotacoes((req, res) => {
-  const cotacao = cotacoesService.atualizar(req.params.id, req.body, req.cotacoesUser);
-  res.json({ success: true, cotacao });
-}));
-
-app.post('/api/cotacoes/:id/duplicar', rotaCotacoes((req, res) => {
-  const cotacao = cotacoesService.duplicar(req.params.id, req.cotacoesUser);
-  res.status(201).json({ success: true, cotacao });
-}));
-
-app.post('/api/cotacoes/:id/finalizar', rotaCotacoes((req, res) => {
-  const cotacao = cotacoesService.finalizar(req.params.id, req.cotacoesUser);
-  res.json({ success: true, cotacao });
-}));
-
-app.post('/api/cotacoes/:id/cancelar', rotaCotacoes((req, res) => {
-  const cotacao = cotacoesService.cancelar(req.params.id, req.body, req.cotacoesUser);
-  res.json({ success: true, cotacao });
-}));
-
-app.delete('/api/cotacoes/:id', rotaCotacoes((req, res) => {
-  cotacoesService.excluir(req.params.id);
-  res.json({ success: true });
-}));
-
-app.get('/api/cotacoes/:id/impressao', rotaCotacoes((req, res) => {
-  const cotacao = cotacoesService.obter(req.params.id);
-  res.json({
-    cotacao,
-    impressao: {
-      geradoEm: new Date().toISOString(),
-      geradoPor: {
-        usuario: req.cotacoesUser.usuario,
-        nome: req.cotacoesUser.nome || ''
-      }
-    }
-  });
-}));
-
-// Mantém erros de corpo JSON do módulo no mesmo contrato das demais respostas.
-app.use((error, req, res, next) => {
-  if (!req.path.startsWith('/api/cotacoes')) return next(error);
-  if (error && error.type === 'entity.too.large') {
-    return res.status(413).json({
-      error: 'O corpo da requisição excede o limite de 16 MB.',
-      codigo: 'CORPO_MUITO_GRANDE'
-    });
-  }
-  if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
-    return res.status(400).json({
-      error: 'O corpo da requisição contém JSON inválido.',
-      codigo: 'JSON_INVALIDO'
-    });
-  }
-  next(error);
-});
-
-// ═══════════════════════════════════════════
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });

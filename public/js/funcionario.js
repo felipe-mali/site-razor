@@ -27,15 +27,13 @@ const SENHA_ADMIN = "M@lima1980";
    ======================================== */
 
 function podeAcessarModuloCotacoes(usuario) {
-  return Boolean(usuario && usuario.ativo === true && (
-    usuario.cargo === 'logistica' ||
-    usuario.cargo === 'admin' ||
-    usuario.pode_gerenciar_permissoes === true ||
-    usuario.pode_acessar_cotacoes === true
-  ));
+  return Boolean(window.CotacoesModelo && window.CotacoesModelo.podeAcessar(usuario));
 }
 
 window.podeAcessarModuloCotacoes = podeAcessarModuloCotacoes;
+window.usuarioAtualPodeAcessarCotacoes = function () {
+  return podeAcessarModuloCotacoes(user);
+};
 
 function aplicarPermissoesSidebar() {
   var cargo = user ? user.cargo : '';

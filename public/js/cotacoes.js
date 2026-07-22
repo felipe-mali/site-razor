@@ -1,44 +1,19 @@
-(function iniciarModuloCotacoes(window, document) {
+(function iniciarCalculadoraCotacoes(window, document) {
   'use strict';
 
   var Financeiro = window.CotacoesFinanceiro;
+  var Modelo = window.CotacoesModelo;
   var PrintView = window.CotacoesPrintView;
-  var API_BASE = '/api/cotacoes';
-  var LIMITE_PAGINA = 20;
-  var AUTOSAVE_MS = 1100;
-  var STATUS = {
-    em_andamento: 'Em andamento',
-    aguardando_aprovacao: 'Aguardando aprovação',
-    aprovada: 'Aprovada',
-    finalizada: 'Finalizada',
-    cancelada: 'Cancelada'
-  };
-  var estado = {
-    inicializado: false,
-    autorizado: false,
-    carregandoHistorico: false,
-    pagina: 1,
-    totalPaginas: 1,
-    cotacao: null,
-    calculos: null,
-    sujo: false,
-    salvando: false,
-    revisao: 0,
-    timerAutosave: null,
-    frameCalculo: null,
-    calculoCompletoPendente: false,
-    itensCalculoPendentes: new Set(),
-    indicePrecos: new Map(),
-    requisicaoLista: 0,
-    requisicaoCotacao: 0,
-    acaoEmCurso: false,
-    vista: 'historico',
-    imprimindo: false
-  };
+  var estado = Modelo ? Modelo.criarEstado() : null;
+  var calculos = null;
   var elementos = {};
-  var sequenciaTemporaria = 0;
+  var inicializado = false;
+  var focoAntesDaPrevia = null;
+  var timerStatus = null;
 
-  function porId(id) { return document.getElementById(id); }
+  function porId(id) {
+    return document.getElementById(id);
+  }
 
   function escapar(valor) {
     return String(valor === undefined || valor === null ? '' : valor)
@@ -54,48 +29,21 @@
     return String(valor).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 
-  function idTemporario(prefixo) {
-    sequenciaTemporaria += 1;
-    return 'tmp-' + prefixo + '-' + Date.now().toString(36) + '-' + sequenciaTemporaria.toString(36);
-  }
-
-  function usuarioLocal() {
-    try {
-      var bruto = window.localStorage.getItem('user');
-      var usuario = bruto ? JSON.parse(bruto) : null;
-      return usuario && typeof usuario === 'object' ? usuario : null;
-    } catch (erro) {
-      return null;
-    }
-  }
-
   function possuiAcesso() {
-    var usuario = usuarioLocal();
-    if (typeof window.podeAcessarModuloCotacoes === 'function') {
-      return window.podeAcessarModuloCotacoes(usuario);
-    }
-    return Boolean(usuario && usuario.ativo === true && (
-      usuario.cargo === 'logistica' ||
-      usuario.cargo === 'admin' ||
-      usuario.pode_gerenciar_permissoes === true ||
-      usuario.pode_acessar_cotacoes === true
-    ));
+    return typeof window.usuarioAtualPodeAcessarCotacoes === 'function' &&
+      window.usuarioAtualPodeAcessarCotacoes();
   }
 
   function mostrarAcessoNegado() {
-    estado.autorizado = false;
     if (elementos.app) elementos.app.hidden = true;
-    if (elementos.printPreview) elementos.printPreview.hidden = true;
-    document.body.classList.remove('cotacoes-printing');
-    estado.imprimindo = false;
+    fecharPrevia();
     if (elementos.acessoNegado) {
       elementos.acessoNegado.hidden = false;
       elementos.acessoNegado.innerHTML =
         '<div class="cotacoes-access-card" role="alert">' +
-          '<div class="cotacoes-access-icon" aria-hidden="true">!</div>' +
           '<p class="cotacoes-eyebrow">Permissão necessária</p>' +
           '<h2>ACESSO NEGADO</h2>' +
-          '<p>Você não possui permissão para acessar o módulo de Cotação de Preços.</p>' +
+          '<p>Você não possui permissão para acessar a Calculadora de Cotação de Preços.</p>' +
         '</div>';
     }
   }
@@ -105,1357 +53,515 @@
       mostrarAcessoNegado();
       return false;
     }
-    estado.autorizado = true;
     if (elementos.app) elementos.app.hidden = false;
     if (elementos.acessoNegado) elementos.acessoNegado.hidden = true;
     return true;
   }
 
-  function erroApi(mensagem, status, codigo, detalhes) {
-    var erro = new Error(mensagem || 'Não foi possível concluir a operação.');
-    erro.status = status || 0;
-    erro.codigo = codigo || '';
-    erro.detalhes = detalhes;
-    return erro;
-  }
-
-  async function chamarApi(caminho, opcoes) {
-    /* Esta verificação ocorre imediatamente antes de toda chamada HTTP. */
-    if (!autorizarOuNegar()) throw erroApi('Permissão de Cotação de Preços necessária.', 403, 'ACESSO_NEGADO');
-    var tokenAtual = window.localStorage.getItem('token');
-    if (!tokenAtual) throw erroApi('Sessão expirada. Entre novamente.', 401, 'NAO_AUTENTICADO');
-    var configuracao = Object.assign({}, opcoes || {});
-    configuracao.headers = Object.assign({}, configuracao.headers || {}, {
-      Authorization: 'Bearer ' + tokenAtual
-    });
-    if (configuracao.body !== undefined && typeof configuracao.body !== 'string') {
-      configuracao.headers['Content-Type'] = 'application/json';
-      configuracao.body = JSON.stringify(configuracao.body);
-    }
-
-    var resposta;
-    try {
-      resposta = await window.fetch(API_BASE + caminho, configuracao);
-    } catch (erro) {
-      throw erroApi('Servidor indisponível. Verifique a conexão e tente novamente.', 0, 'SEM_CONEXAO');
-    }
-    var dados = null;
-    try { dados = await resposta.json(); } catch (erroJson) { dados = null; }
-    if (!resposta.ok) {
-      if (resposta.status === 403) mostrarAcessoNegado();
-      throw erroApi(
-        dados && (dados.error || dados.message) || 'A operação não pôde ser concluída.',
-        resposta.status,
-        dados && dados.codigo,
-        dados && dados.detalhes
-      );
-    }
-    return dados || {};
-  }
-
-  function formatarData(valor, hora) {
-    if (!valor) return '—';
-    var data = new Date(valor);
-    if (Number.isNaN(data.getTime())) return String(valor);
-    var opcoes = { day: '2-digit', month: '2-digit', year: 'numeric' };
-    if (hora) { opcoes.hour = '2-digit'; opcoes.minute = '2-digit'; }
-    return new Intl.DateTimeFormat('pt-BR', opcoes).format(data);
-  }
-
-  function dinheiro(valor) {
-    return Financeiro && Financeiro.formatarCentavos(valor) || '—';
-  }
-
-  function dinheiroParaEdicao(valor) {
-    if (!Number.isSafeInteger(valor)) return '';
-    return Financeiro.formatarCentavos(valor).replace(/^R\$\s*/, '');
-  }
-
-  function quantidade(valor) {
-    return Financeiro && Financeiro.formatarQuantidade(valor) || '—';
-  }
-
-  function nomeResponsavel(responsavel) {
-    if (!responsavel) return '—';
-    if (typeof responsavel === 'string') return responsavel;
-    return responsavel.nome || responsavel.usuario || '—';
-  }
-
-  function nomeFornecedor(fornecedor) {
-    return fornecedor && (fornecedor.nome || fornecedor.nomeFantasia || fornecedor.razaoSocial || fornecedor.cnpj) || 'Fornecedor sem nome';
-  }
-
-  function clonar(valor) {
-    return JSON.parse(JSON.stringify(valor));
-  }
-
-  function novaCotacao() {
-    var usuario = usuarioLocal() || {};
-    return {
-      id: null,
-      numero: '',
-      status: 'em_andamento',
-      criadoEm: null,
-      atualizadoEm: null,
-      responsavel: { usuario: usuario.usuario || '', nome: usuario.nome || usuario.usuario || '' },
-      departamento: 'Logística',
-      centroCusto: '',
-      descricaoCompra: '',
-      observacoesInternas: '',
-      aprovacao: { elaboradoPor: usuario.nome || usuario.usuario || '', conferidoPor: '', aprovadoPor: '', data: '' },
-      itens: [],
-      fornecedores: [],
-      precos: []
-    };
-  }
-
-  function novoItem(base) {
-    var item = base || {};
-    return {
-      id: idTemporario('item'),
-      codigo: item.codigo || '',
-      descricao: item.descricao ? item.descricao + ' (cópia)' : '',
-      unidade: item.unidade || 'UN',
-      quantidadeMillesimos: Number.isSafeInteger(item.quantidadeMillesimos) ? item.quantidadeMillesimos : 1000,
-      observacao: item.observacao || '',
-      ordem: 0,
-      ativo: item.ativo !== false
-    };
-  }
-
-  function novoFornecedor(base) {
-    var fornecedor = base || {};
-    return {
-      id: idTemporario('fornecedor'),
-      nome: base ? (nomeFornecedor(base) + ' (cópia)') : '',
-      nomeFantasia: '',
-      razaoSocial: '',
-      cnpj: '',
-      contato: fornecedor.contato || '',
-      telefone: fornecedor.telefone || '',
-      email: fornecedor.email || '',
-      formaPagamento: fornecedor.formaPagamento || '',
-      prazoEntrega: fornecedor.prazoEntrega || '',
-      freteCentavos: Number.isSafeInteger(fornecedor.freteCentavos) ? fornecedor.freteCentavos : 0,
-      validadeProposta: fornecedor.validadeProposta || '',
-      observacoes: fornecedor.observacoes || '',
-      ordem: 0,
-      ativoComparacao: fornecedor.ativoComparacao !== false
-    };
-  }
-
-  function normalizarEstadoCotacao(cotacao) {
-    var normalizada = Object.assign(novaCotacao(), cotacao || {});
-    normalizada.itens = Array.isArray(normalizada.itens) ? normalizada.itens : [];
-    normalizada.fornecedores = Array.isArray(normalizada.fornecedores) ? normalizada.fornecedores : [];
-    normalizada.precos = Array.isArray(normalizada.precos) ? normalizada.precos : [];
-    normalizada.itens.forEach(function (item, indice) {
-      if (!item.id) item.id = idTemporario('item');
-      if (!Number.isSafeInteger(item.quantidadeMillesimos) && Number.isSafeInteger(item.quantidadeMilesimos)) {
-        item.quantidadeMillesimos = item.quantidadeMilesimos;
-      }
-      item.ordem = indice;
-      if (item.ativo === undefined) item.ativo = true;
-    });
-    normalizada.fornecedores.forEach(function (fornecedor, indice) {
-      if (!fornecedor.id) fornecedor.id = idTemporario('fornecedor');
-      fornecedor.ordem = indice;
-      if (fornecedor.ativoComparacao === undefined) fornecedor.ativoComparacao = true;
-      if (!Number.isSafeInteger(fornecedor.freteCentavos)) fornecedor.freteCentavos = 0;
-    });
-    normalizada.precos = normalizada.precos.filter(function (preco) {
-      return preco && preco.itemId && preco.fornecedorId;
-    });
-    garantirMatriz(normalizada);
-    return normalizada;
-  }
-
-  function chavePreco(itemId, fornecedorId) {
-    return String(itemId) + '::' + String(fornecedorId);
-  }
-
-  function mapaPrecos(cotacao) {
-    var mapa = new Map();
-    (cotacao.precos || []).forEach(function (preco) {
-      mapa.set(chavePreco(preco.itemId, preco.fornecedorId), preco);
-    });
-    return mapa;
-  }
-
-  function garantirMatriz(cotacao) {
-    var existentes = mapaPrecos(cotacao);
-    var matriz = [];
-    cotacao.itens.forEach(function (item) {
-      cotacao.fornecedores.forEach(function (fornecedor) {
-        var chave = chavePreco(item.id, fornecedor.id);
-        var preco = existentes.get(chave);
-        matriz.push(preco || {
-          id: idTemporario('preco'),
-          itemId: item.id,
-          fornecedorId: fornecedor.id,
-          valorUnitarioCentavos: null,
-          observacao: '',
-          indisponivel: false
-        });
-      });
-    });
-    /* A iteração cartesiana já produz um único registro por par e descarta órfãos. */
-    cotacao.precos = matriz;
-    if (cotacao === estado.cotacao) estado.indicePrecos = mapaPrecos(cotacao);
-  }
-
-  function obterPreco(itemId, fornecedorId) {
-    var chave = chavePreco(itemId, fornecedorId);
-    if (!estado.indicePrecos.size && estado.cotacao.precos.length) estado.indicePrecos = mapaPrecos(estado.cotacao);
-    var existente = estado.indicePrecos.get(chave);
-    if (existente) return existente;
-    var novo = { id: idTemporario('preco'), itemId: itemId, fornecedorId: fornecedorId, valorUnitarioCentavos: null, observacao: '', indisponivel: false };
-    estado.cotacao.precos.push(novo);
-    estado.indicePrecos.set(chave, novo);
-    return novo;
-  }
-
-  function chaveRascunho(cotacao) {
-    var usuario = usuarioLocal() || {};
-    return 'cotacoes:rascunho:' + (usuario.usuario || 'anonimo') + ':' + (cotacao && cotacao.id || 'novo');
-  }
-
-  function salvarRascunhoLocal() {
-    if (!estado.cotacao || !estado.sujo || estado.cotacao.status !== 'em_andamento') return;
-    try {
-      window.localStorage.setItem(chaveRascunho(estado.cotacao), JSON.stringify({
-        salvoEm: new Date().toISOString(),
-        cotacao: estado.cotacao
-      }));
-    } catch (erro) { /* armazenamento local é uma proteção auxiliar */ }
-  }
-
-  function lerRascunhoLocal(cotacao) {
-    try {
-      var bruto = window.localStorage.getItem(chaveRascunho(cotacao));
-      if (!bruto) return null;
-      var dados = JSON.parse(bruto);
-      return dados && dados.cotacao ? dados : null;
-    } catch (erro) { return null; }
-  }
-
-  function removerRascunhoLocal(cotacao, incluirNovo) {
-    try {
-      window.localStorage.removeItem(chaveRascunho(cotacao));
-      if (incluirNovo) window.localStorage.removeItem(chaveRascunho({ id: null }));
-    } catch (erro) { /* noop */ }
-  }
-
-  function definirEstadoSalvamento(tipo, texto) {
-    if (!elementos.saveState) return;
-    elementos.saveState.dataset.state = tipo;
-    elementos.saveState.textContent = texto;
-  }
-
-  function marcarSujo() {
-    if (!estado.cotacao || estado.cotacao.status !== 'em_andamento') return;
-    estado.sujo = true;
-    estado.revisao += 1;
-    definirEstadoSalvamento('dirty', 'Não salvo');
-    salvarRascunhoLocal();
-    agendarAutosave();
-  }
-
-  function agendarAutosave() {
-    window.clearTimeout(estado.timerAutosave);
-    estado.timerAutosave = window.setTimeout(function () {
-      salvarCotacao({ automatico: true }).catch(function () { /* estado visual já atualizado */ });
-    }, AUTOSAVE_MS);
-  }
-
-  function cancelarAgendamentosEdicao() {
-    window.clearTimeout(estado.timerAutosave);
-    estado.timerAutosave = null;
-    if (estado.frameCalculo) window.cancelAnimationFrame(estado.frameCalculo);
-    estado.frameCalculo = null;
-    estado.calculoCompletoPendente = false;
-    estado.itensCalculoPendentes.clear();
-  }
-
-  function podeEditar() {
-    return Boolean(estado.cotacao && estado.cotacao.status === 'em_andamento');
-  }
-
-  function capturarFoco() {
-    var ativo = document.activeElement;
-    if (!ativo || !elementos.editor || !elementos.editor.contains(ativo)) return null;
-    return {
-      seletor: ativo.dataset && ativo.dataset.focusKey,
-      inicio: typeof ativo.selectionStart === 'number' ? ativo.selectionStart : null,
-      fim: typeof ativo.selectionEnd === 'number' ? ativo.selectionEnd : null,
-      scrollLeft: elementos.tabelaWrap ? elementos.tabelaWrap.scrollLeft : 0,
-      scrollTop: elementos.tabelaWrap ? elementos.tabelaWrap.scrollTop : 0
-    };
-  }
-
-  function restaurarFoco(foco) {
-    if (!foco) return;
-    if (elementos.tabelaWrap) {
-      elementos.tabelaWrap.scrollLeft = foco.scrollLeft;
-      elementos.tabelaWrap.scrollTop = foco.scrollTop;
-    }
-    if (!foco.seletor) return;
-    var alvo = elementos.editor.querySelector('[data-focus-key="' + escaparSeletor(foco.seletor) + '"]');
-    if (!alvo) return;
-    alvo.focus();
-    if (foco.inicio !== null && typeof alvo.setSelectionRange === 'function') {
-      try { alvo.setSelectionRange(foco.inicio, foco.fim); } catch (erro) { /* noop */ }
+  function mostrarStatus(mensagem, tipo, temporario) {
+    if (!elementos.status) return;
+    window.clearTimeout(timerStatus);
+    elementos.status.textContent = mensagem || '';
+    elementos.status.dataset.state = tipo || 'info';
+    if (temporario) {
+      timerStatus = window.setTimeout(function () {
+        atualizarStatusContagem();
+      }, 2800);
     }
   }
 
-  function mostrarVista(nome) {
-    estado.vista = nome;
-    elementos.historico.hidden = nome !== 'historico';
-    elementos.editor.hidden = nome !== 'editor';
+  function atualizarStatusContagem() {
+    if (!estado) return;
+    mostrarStatus(
+      estado.produtos.length + (estado.produtos.length === 1 ? ' produto' : ' produtos') +
+      ' · ' + estado.fornecedores.length +
+      (estado.fornecedores.length === 1 ? ' fornecedor' : ' fornecedores'),
+      'info',
+      false
+    );
   }
 
-  function mostrarErroGeral(erros) {
-    if (!elementos.erros) return;
-    var lista = Array.isArray(erros) ? erros : [erros];
-    lista = lista.filter(Boolean);
-    if (!lista.length) {
-      elementos.erros.hidden = true;
-      elementos.erros.innerHTML = '';
-      return;
-    }
-    elementos.erros.innerHTML = '<strong>Revise a cotação:</strong><ul>' + lista.map(function (erro) {
-      return '<li>' + escapar(erro) + '</li>';
-    }).join('') + '</ul>';
-    elementos.erros.hidden = false;
-    elementos.erros.focus();
+  function fornecedorPorId(id) {
+    return estado.fornecedores.find(function (fornecedor) { return fornecedor.id === id; });
   }
 
-  function mensagemErro(erro) {
-    var mensagens = [erro && erro.message || 'Erro inesperado.'];
-    var detalhes = erro && erro.detalhes;
-    if (detalhes && Array.isArray(detalhes.problemas)) mensagens = mensagens.concat(detalhes.problemas);
-    return mensagens;
+  function produtoCalculadoPorId(id) {
+    return calculos && calculos.produtos.find(function (produto) { return produto.produtoId === id; });
   }
 
-  function validarCotacao(paraFinalizar) {
-    var cotacao = estado.cotacao;
-    var erros = [];
-    if (!String(cotacao.descricaoCompra || '').trim()) erros.push('Informe a descrição da compra.');
-    if (paraFinalizar && !cotacao.itens.length) erros.push('Adicione pelo menos um item.');
-    if (paraFinalizar && !cotacao.fornecedores.length) erros.push('Adicione pelo menos um fornecedor.');
-    cotacao.itens.forEach(function (item, indice) {
-      if (!String(item.descricao || '').trim()) erros.push('Informe a descrição do item ' + (indice + 1) + '.');
-      if (!Number.isSafeInteger(item.quantidadeMillesimos) || item.quantidadeMillesimos <= 0) {
-        erros.push('Informe uma quantidade válida para o item ' + (indice + 1) + '.');
-      }
-    });
-    var nomes = new Set();
-    var cnpjs = new Set();
-    cotacao.fornecedores.forEach(function (fornecedor, indice) {
-      var identificacao = String(fornecedor.nome || fornecedor.nomeFantasia || fornecedor.razaoSocial || '').trim();
-      if (!identificacao && !fornecedor.cnpj) erros.push('Identifique o fornecedor ' + (indice + 1) + '.');
-      var chaveNome = identificacao.toLocaleLowerCase('pt-BR');
-      if (chaveNome && nomes.has(chaveNome)) erros.push('Há fornecedores com o mesmo nome.');
-      if (chaveNome) nomes.add(chaveNome);
-      var cnpj = Financeiro.normalizarCnpj(fornecedor.cnpj);
-      if (cnpj && !Financeiro.validarCnpj(cnpj)) erros.push('O CNPJ do fornecedor ' + (indice + 1) + ' é inválido.');
-      if (cnpj && cnpjs.has(cnpj)) erros.push('Há fornecedores com o mesmo CNPJ.');
-      if (cnpj) cnpjs.add(cnpj);
-      if (!Number.isSafeInteger(fornecedor.freteCentavos) || fornecedor.freteCentavos < 0) {
-        erros.push('Informe um frete válido para o fornecedor ' + (indice + 1) + '.');
-      }
-      if (fornecedor.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(fornecedor.email).trim())) {
-        erros.push('O e-mail do fornecedor ' + (indice + 1) + ' é inválido.');
-      }
-    });
-    cotacao.precos.forEach(function (preco) {
-      if (preco.indisponivel === true) return;
-      var digitado = String(preco._valorDigitado === undefined ? '' : preco._valorDigitado).trim();
-      if ((digitado && preco.valorUnitarioCentavos === null) ||
-          (Number.isSafeInteger(preco.valorUnitarioCentavos) && preco.valorUnitarioCentavos <= 0)) {
-        erros.push('Os preços informados devem ser valores monetários maiores que zero.');
-      }
-    });
-    if (paraFinalizar) {
-      recalcular();
-      if (!estado.calculos || !estado.calculos.custoIdealCompleto) erros.push('Todos os itens precisam ter ao menos um preço válido.');
-      if (!estado.calculos || !estado.calculos.fornecedorIdsRecomendados.length) erros.push('É necessário ao menos um fornecedor ativo com proposta completa.');
-    }
-    return Array.from(new Set(erros));
+  function fornecedorCalculadoPorId(id) {
+    return calculos && calculos.fornecedores.find(function (fornecedor) { return fornecedor.fornecedorId === id; });
   }
 
-  function cotacaoValidaParaAutosave() {
-    var cotacao = estado.cotacao;
-    if (!cotacao || cotacao.status !== 'em_andamento') return false;
-    return cotacao.itens.every(function (item) {
-      return String(item.descricao || '').trim() && Number.isSafeInteger(item.quantidadeMillesimos) && item.quantidadeMillesimos > 0;
-    }) && cotacao.fornecedores.every(function (fornecedor) {
-      var identificado = fornecedor.nome || fornecedor.nomeFantasia || fornecedor.razaoSocial || fornecedor.cnpj;
-      var cnpj = Financeiro.normalizarCnpj(fornecedor.cnpj);
-      return Boolean(String(identificado || '').trim()) && (!cnpj || Financeiro.validarCnpj(cnpj)) &&
-        (!fornecedor.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(fornecedor.email).trim())) &&
-        Number.isSafeInteger(fornecedor.freteCentavos) && fornecedor.freteCentavos >= 0;
-    }) && cotacao.precos.every(function (preco) {
-      if (preco.indisponivel === true) return true;
-      var digitado = String(preco._valorDigitado === undefined ? '' : preco._valorDigitado).trim();
-      return !(digitado && preco.valorUnitarioCentavos === null) &&
-        !(Number.isSafeInteger(preco.valorUnitarioCentavos) && preco.valorUnitarioCentavos <= 0);
-    });
+  function celulaPrecoHtml(produto, fornecedor, calculado) {
+    var chave = Modelo.chavePreco(produto.id, fornecedor.id);
+    var preco = estado.precos[chave];
+    var menor = Boolean(calculado && calculado.menorPreco);
+    var nome = fornecedor.nome || 'Fornecedor';
+    return '' +
+      '<td class="cotacoes-col-supplier cotacoes-price-cell" data-preco-celula="' + escapar(chave) + '" data-best="' + menor + '">' +
+        '<label class="cotacoes-money-input">' +
+          '<span aria-hidden="true">R$</span>' +
+          '<input type="text" inputmode="decimal" autocomplete="off" ' +
+            'data-preco-chave="' + escapar(chave) + '" data-produto-id="' + escapar(produto.id) + '" ' +
+            'data-fornecedor-id="' + escapar(fornecedor.id) + '" value="' + escapar(Financeiro.formatarMoedaInput(preco)) + '" ' +
+            'aria-label="Valor unitário de ' + escapar(produto.descricao || 'produto sem descrição') + ' em ' + escapar(nome) +
+            (menor ? '. Menor preço desta linha' : '') + '">' +
+        '</label>' +
+        '<span class="cotacoes-best-marker"' + (menor ? '' : ' hidden') + '>Menor</span>' +
+      '</td>' +
+      '<td class="cotacoes-col-supplier cotacoes-readonly-money" data-total-chave="' + escapar(chave) + '">' +
+        Financeiro.formatarMoeda(calculado && calculado.valorTotalCentavos, '') +
+      '</td>';
   }
 
-  function prepararPayload(cotacao) {
-    garantirMatriz(cotacao);
-    cotacao.itens.forEach(function (item, indice) { item.ordem = indice; });
-    cotacao.fornecedores.forEach(function (fornecedor, indice) { fornecedor.ordem = indice; });
-    return {
-      departamento: cotacao.departamento || '',
-      centroCusto: cotacao.centroCusto || '',
-      descricaoCompra: cotacao.descricaoCompra || '',
-      observacoesInternas: cotacao.observacoesInternas || '',
-      aprovacao: cotacao.aprovacao || {},
-      itens: cotacao.itens.map(function (item) {
-        return {
-          id: item.id, codigo: item.codigo || '', descricao: item.descricao || '', unidade: item.unidade || 'UN',
-          quantidadeMillesimos: item.quantidadeMillesimos, observacao: item.observacao || '', ordem: item.ordem, ativo: item.ativo !== false
-        };
-      }),
-      fornecedores: cotacao.fornecedores.map(function (fornecedor) {
-        return {
-          id: fornecedor.id, nome: fornecedor.nome || '', nomeFantasia: fornecedor.nomeFantasia || '', razaoSocial: fornecedor.razaoSocial || '',
-          cnpj: fornecedor.cnpj || '', contato: fornecedor.contato || '', telefone: fornecedor.telefone || '', email: fornecedor.email || '',
-          formaPagamento: fornecedor.formaPagamento || '', prazoEntrega: fornecedor.prazoEntrega || '', freteCentavos: fornecedor.freteCentavos,
-          validadeProposta: fornecedor.validadeProposta || '', observacoes: fornecedor.observacoes || '', ordem: fornecedor.ordem,
-          ativoComparacao: fornecedor.ativoComparacao !== false
-        };
-      }),
-      precos: cotacao.precos.map(function (preco) {
-        return {
-          id: preco.id, itemId: preco.itemId, fornecedorId: preco.fornecedorId,
-          valorUnitarioCentavos: preco.valorUnitarioCentavos, observacao: preco.observacao || '', indisponivel: preco.indisponivel === true
-        };
-      })
-    };
+  function linhaProdutoHtml(produto, indice) {
+    var calculado = produtoCalculadoPorId(produto.id);
+    var fornecedoresHtml = estado.fornecedores.map(function (fornecedor) {
+      return celulaPrecoHtml(produto, fornecedor, calculado && calculado.porFornecedor[fornecedor.id]);
+    }).join('');
+    return '' +
+      '<tr data-produto-linha="' + escapar(produto.id) + '">' +
+        '<th scope="row" class="cotacoes-col-number">' + (indice + 1) + '</th>' +
+        '<td class="cotacoes-col-item">' +
+          '<label class="sr-only" for="produto-' + escapar(produto.id) + '">Descrição do produto ' + (indice + 1) + '</label>' +
+          '<input id="produto-' + escapar(produto.id) + '" class="cotacoes-product-input" type="text" maxlength="240" ' +
+            'data-produto-descricao="' + escapar(produto.id) + '" value="' + escapar(produto.descricao) + '" placeholder="Descrição do produto" autocomplete="off">' +
+          '<span class="cotacoes-row-actions">' +
+            '<button type="button" data-acao="duplicar-produto" data-produto-id="' + escapar(produto.id) + '">Duplicar</button>' +
+            '<button type="button" data-acao="remover-produto" data-produto-id="' + escapar(produto.id) + '">Remover</button>' +
+          '</span>' +
+        '</td>' +
+        '<td class="cotacoes-col-quantity">' +
+          '<label class="sr-only" for="quantidade-' + escapar(produto.id) + '">Quantidade de ' + escapar(produto.descricao || 'produto ' + (indice + 1)) + '</label>' +
+          '<input id="quantidade-' + escapar(produto.id) + '" class="cotacoes-quantity-input" type="text" inputmode="decimal" autocomplete="off" ' +
+            'data-produto-quantidade="' + escapar(produto.id) + '" value="' + escapar(Financeiro.formatarQuantidade(produto.quantidadeMillesimos, '')) + '" aria-label="Quantidade do produto ' + (indice + 1) + '">' +
+        '</td>' +
+        fornecedoresHtml +
+        '<td class="cotacoes-col-ideal cotacoes-readonly-money" data-ideal-unitario="' + escapar(produto.id) + '">' +
+          Financeiro.formatarMoeda(calculado && calculado.menorValorUnitarioCentavos, '') +
+        '</td>' +
+        '<td class="cotacoes-col-ideal cotacoes-readonly-money" data-ideal-total="' + escapar(produto.id) + '">' +
+          Financeiro.formatarMoeda(calculado && calculado.custoIdealTotalCentavos, '') +
+        '</td>' +
+      '</tr>';
   }
 
-  function sincronizarMetadadosSalvos(edicaoAtual, salvo) {
-    /*
-     * Se o usuário continuou digitando durante a requisição, os IDs temporários
-     * permanecem até o próximo autosave. Assim os data-attributes da matriz não
-     * ficam obsoletos no meio da edição; a próxima resposta ociosa reidrata os
-     * IDs definitivos do servidor de uma só vez.
-     */
-    edicaoAtual.id = salvo.id;
-    edicaoAtual.numero = salvo.numero;
-    edicaoAtual.criadoEm = salvo.criadoEm;
-    edicaoAtual.atualizadoEm = salvo.atualizadoEm;
-    edicaoAtual.responsavel = salvo.responsavel;
+  function cabecalhoFornecedorHtml(fornecedor) {
+    return '' +
+      '<th class="cotacoes-col-supplier cotacoes-supplier-group" colspan="2" scope="colgroup">' +
+        '<div class="cotacoes-supplier-head">' +
+          '<label class="sr-only" for="fornecedor-' + escapar(fornecedor.id) + '">Nome do fornecedor</label>' +
+          '<input id="fornecedor-' + escapar(fornecedor.id) + '" type="text" maxlength="160" value="' + escapar(fornecedor.nome) + '" ' +
+            'data-fornecedor-nome="' + escapar(fornecedor.id) + '" aria-label="Nome do fornecedor ' + escapar(fornecedor.nome) + '">' +
+          '<button type="button" data-acao="remover-fornecedor" data-fornecedor-id="' + escapar(fornecedor.id) + '" aria-label="Remover fornecedor ' + escapar(fornecedor.nome) + '">Remover</button>' +
+        '</div>' +
+      '</th>';
   }
 
-  async function salvarCotacao(opcoes) {
-    var automatico = Boolean(opcoes && opcoes.automatico);
-    if (!estado.cotacao || !podeEditar() || !estado.sujo) return estado.cotacao;
-    if (estado.salvando) return estado.cotacao;
-    if (automatico && !cotacaoValidaParaAutosave()) return estado.cotacao;
-    if (!automatico) {
-      var erros = validarCotacao(false);
-      mostrarErroGeral(erros);
-      if (erros.length) throw erroApi('Existem campos obrigatórios pendentes.', 422, 'VALIDACAO_LOCAL');
-    }
-
-    window.clearTimeout(estado.timerAutosave);
-    estado.salvando = true;
-    atualizarBotoes();
-    definirEstadoSalvamento('saving', 'Salvando…');
-    var revisaoEnviada = estado.revisao;
-    var cotacaoReferencia = estado.cotacao;
-    var cotacaoEnviada = clonar(estado.cotacao);
-    var eraNova = !cotacaoEnviada.id;
-    try {
-      var resposta = eraNova
-        ? await chamarApi('', { method: 'POST', body: prepararPayload(cotacaoEnviada) })
-        : await chamarApi('/' + encodeURIComponent(cotacaoEnviada.id), { method: 'PUT', body: prepararPayload(cotacaoEnviada) });
-      if (estado.cotacao !== cotacaoReferencia) return estado.cotacao;
-      var salva = normalizarEstadoCotacao(resposta.cotacao);
-      removerRascunhoLocal(cotacaoEnviada, eraNova);
-      if (estado.revisao === revisaoEnviada) {
-        var foco = capturarFoco();
-        estado.cotacao = salva;
-        estado.sujo = false;
-        renderizarEditor();
-        restaurarFoco(foco);
-        definirEstadoSalvamento('saved', 'Salvo');
-      } else {
-        sincronizarMetadadosSalvos(estado.cotacao, salva);
-        salvarRascunhoLocal();
-        definirEstadoSalvamento('dirty', 'Não salvo');
-        agendarAutosave();
-      }
-      mostrarErroGeral([]);
-      return estado.cotacao;
-    } catch (erro) {
-      if (estado.cotacao !== cotacaoReferencia) return estado.cotacao;
-      definirEstadoSalvamento('error', automatico ? 'Erro no autosave' : 'Erro ao salvar');
-      salvarRascunhoLocal();
-      if (!automatico) mostrarErroGeral(mensagemErro(erro));
-      throw erro;
-    } finally {
-      estado.salvando = false;
-      if (estado.cotacao !== cotacaoReferencia && estado.sujo) agendarAutosave();
-      atualizarBotoes();
-    }
+  function rodapeFornecedorHtml(fornecedor) {
+    var calculado = fornecedorCalculadoPorId(fornecedor.id);
+    var completo = Boolean(calculado && calculado.completo);
+    var pendencia = calculado && calculado.faltantes
+      ? calculado.faltantes + (calculado.faltantes === 1 ? ' preço pendente' : ' preços pendentes')
+      : 'Cotação completa';
+    return '' +
+      '<td class="cotacoes-supplier-total" colspan="2">' +
+        '<strong data-total-fornecedor="' + escapar(fornecedor.id) + '">' + Financeiro.formatarMoeda(calculado && calculado.totalCentavos, 'R$ 0,00') + '</strong>' +
+        '<small data-completude-fornecedor="' + escapar(fornecedor.id) + '" data-complete="' + completo + '">' + escapar(pendencia) + '</small>' +
+      '</td>';
   }
 
-  function opcoesOrdenacao() {
-    var valor = elementos.ordenacao.value;
-    var mapa = {
-      atualizada_desc: ['atualizadoEm', 'desc'],
-      criada_desc: ['criadoEm', 'desc'],
-      numero_asc: ['numero', 'asc'],
-      status_asc: ['status', 'asc']
-    };
-    return mapa[valor] || mapa.atualizada_desc;
-  }
+  function renderizarTabela(foco) {
+    if (!elementos.tabela || !estado) return;
+    calculos = Modelo.calcular(estado);
+    var fornecedoresCabecalho = estado.fornecedores.map(cabecalhoFornecedorHtml).join('');
+    var subcabecalhos = estado.fornecedores.map(function () {
+      return '<th class="cotacoes-col-supplier" scope="col">Valor unitário</th><th class="cotacoes-col-supplier" scope="col">Valor total</th>';
+    }).join('');
+    var quantidadeColunas = 5 + estado.fornecedores.length * 2;
+    var corpo = estado.produtos.length
+      ? estado.produtos.map(linhaProdutoHtml).join('')
+      : '<tr><td class="cotacoes-empty-row" colspan="' + quantidadeColunas + '">Adicione um produto para começar a comparação.</td></tr>';
+    var totais = estado.fornecedores.map(rodapeFornecedorHtml).join('');
 
-  async function carregarHistorico(pagina) {
-    if (!autorizarOuNegar()) return;
-    estado.pagina = Math.max(1, Number(pagina) || 1);
-    var ordem = opcoesOrdenacao();
-    var parametros = new URLSearchParams({
-      pagina: String(estado.pagina), limite: String(LIMITE_PAGINA),
-      ordenarPor: ordem[0], ordem: ordem[1]
-    });
-    ['busca', 'status', 'dataInicio', 'dataFim'].forEach(function (nome) {
-      var controle = elementos.filtros.elements[nome];
-      if (controle && controle.value) parametros.set(nome, controle.value);
-    });
-    var idLista = ++estado.requisicaoLista;
-    estado.carregandoHistorico = true;
-    elementos.listaStatus.innerHTML = '<span class="cotacoes-loading">Carregando cotações…</span>';
-    elementos.listaCorpo.innerHTML = '';
-    try {
-      var dados = await chamarApi('?' + parametros.toString());
-      if (idLista !== estado.requisicaoLista) return;
-      renderizarHistorico(dados.cotacoes || [], dados.paginacao || {});
-    } catch (erro) {
-      if (idLista !== estado.requisicaoLista || erro.status === 403) return;
-      elementos.listaStatus.innerHTML = '<span class="cotacoes-error-state">' + escapar(erro.message) + ' <button type="button" class="cotacoes-btn cotacoes-btn-ghost" data-history-action="retry">Tentar novamente</button></span>';
-    } finally {
-      if (idLista === estado.requisicaoLista) estado.carregandoHistorico = false;
-    }
-  }
+    elementos.tabela.innerHTML = '' +
+      '<table class="cotacoes-sheet-table">' +
+        '<caption class="sr-only">Planilha temporária de comparação de preços por produto e fornecedor</caption>' +
+        '<thead>' +
+          '<tr>' +
+            '<th class="cotacoes-col-number" rowspan="2" scope="col">Nº</th>' +
+            '<th class="cotacoes-col-item" rowspan="2" scope="col">Produto</th>' +
+            '<th class="cotacoes-col-quantity" rowspan="2" scope="col">Quantidade</th>' +
+            fornecedoresCabecalho +
+            '<th class="cotacoes-col-ideal" colspan="2" scope="colgroup">Custo ideal</th>' +
+          '</tr>' +
+          '<tr>' + subcabecalhos +
+            '<th class="cotacoes-col-ideal" scope="col">Valor unitário</th>' +
+            '<th class="cotacoes-col-ideal" scope="col">Valor total</th>' +
+          '</tr>' +
+        '</thead>' +
+        '<tbody>' + corpo + '</tbody>' +
+        '<tfoot><tr class="cotacoes-totals-row">' +
+          '<th colspan="3" scope="row">Totais</th>' + totais +
+          '<td class="cotacoes-ideal-total" colspan="2"><strong data-custo-ideal-total>' +
+            Financeiro.formatarMoeda(calculos.custoIdealTotalCentavos, '') +
+          '</strong><small>Custo ideal total</small></td>' +
+        '</tr></tfoot>' +
+      '</table>';
 
-  function renderizarHistorico(cotacoes, paginacao) {
-    estado.totalPaginas = Math.max(1, paginacao.totalPaginas || 1);
-    estado.pagina = paginacao.pagina || estado.pagina;
-    elementos.listaStatus.textContent = (paginacao.total || 0) + ' cotação(ões) encontrada(s).';
-    if (!cotacoes.length) {
-      elementos.listaCorpo.innerHTML = '<tr><td colspan="9"><div class="cotacoes-empty">Nenhuma cotação encontrada para estes filtros.</div></td></tr>';
-    } else {
-      elementos.listaCorpo.innerHTML = cotacoes.map(function (cotacao) {
-        var editavel = cotacao.status === 'em_andamento';
-        return '<tr>' +
-          '<td class="cotacoes-history-number">' + escapar(cotacao.numero) + '</td>' +
-          '<td>' + escapar(formatarData(cotacao.criadoEm, false)) + '</td>' +
-          '<td>' + escapar(nomeResponsavel(cotacao.responsavel)) + '</td>' +
-          '<td><span class="cotacoes-status-badge" data-status="' + escapar(cotacao.status) + '">' + escapar(STATUS[cotacao.status] || cotacao.status) + '</span></td>' +
-          '<td>' + escapar(cotacao.quantidadeItens || 0) + ' / ' + escapar(cotacao.quantidadeFornecedores || 0) + '</td>' +
-          '<td>' + escapar(dinheiro(cotacao.custoIdealTotalCentavos)) + '</td>' +
-          '<td>' + escapar(cotacao.fornecedorRecomendado || '—') + '<br><small>Total: ' + escapar(dinheiro(cotacao.totalRecomendadoCentavos)) + ' · Negociação: ' + escapar(dinheiro(cotacao.descontoSugeridoCentavos)) + '</small></td>' +
-          '<td>' + escapar(formatarData(cotacao.atualizadoEm, true)) + '</td>' +
-          '<td><div class="cotacoes-history-actions">' +
-            '<button type="button" class="cotacoes-btn cotacoes-btn-ghost" data-history-action="open" data-id="' + escapar(cotacao.id) + '">' + (editavel ? 'Editar' : 'Ver') + '</button>' +
-            '<button type="button" class="cotacoes-btn cotacoes-btn-ghost" data-history-action="print" data-id="' + escapar(cotacao.id) + '" title="Imprimir">⎙</button>' +
-            '<button type="button" class="cotacoes-btn cotacoes-btn-ghost" data-history-action="duplicate" data-id="' + escapar(cotacao.id) + '" title="Duplicar">⧉</button>' +
-            (editavel ? '<button type="button" class="cotacoes-btn cotacoes-btn-warning" data-history-action="cancel" data-id="' + escapar(cotacao.id) + '" title="Cancelar">!</button>' : '') +
-            (editavel ? '<button type="button" class="cotacoes-btn cotacoes-btn-danger" data-history-action="delete" data-id="' + escapar(cotacao.id) + '" title="Excluir">×</button>' : '') +
-          '</div></td>' +
-        '</tr>';
-      }).join('');
-    }
-    renderizarPaginacao();
-  }
-
-  function renderizarPaginacao() {
-    if (estado.totalPaginas <= 1) { elementos.paginacao.innerHTML = ''; return; }
-    var inicio = Math.max(1, estado.pagina - 2);
-    var fim = Math.min(estado.totalPaginas, inicio + 4);
-    inicio = Math.max(1, fim - 4);
-    var html = '<button type="button" class="cotacoes-btn cotacoes-btn-ghost" data-page="' + (estado.pagina - 1) + '"' + (estado.pagina === 1 ? ' disabled' : '') + '>Anterior</button>';
-    for (var pagina = inicio; pagina <= fim; pagina += 1) {
-      html += '<button type="button" class="cotacoes-btn cotacoes-btn-ghost" data-page="' + pagina + '"' + (pagina === estado.pagina ? ' aria-current="page"' : '') + '>' + pagina + '</button>';
-    }
-    html += '<button type="button" class="cotacoes-btn cotacoes-btn-ghost" data-page="' + (estado.pagina + 1) + '"' + (estado.pagina === estado.totalPaginas ? ' disabled' : '') + '>Próxima</button>';
-    elementos.paginacao.innerHTML = html;
-  }
-
-  async function abrirCotacao(id, imprimirDireto) {
-    if (!autorizarOuNegar()) return;
-    cancelarAgendamentosEdicao();
-    var requisicaoAtual = ++estado.requisicaoCotacao;
-    elementos.listaStatus.innerHTML = '<span class="cotacoes-loading">Abrindo cotação…</span>';
-    try {
-      var dados = await chamarApi('/' + encodeURIComponent(id) + (imprimirDireto ? '/impressao' : ''));
-      if (requisicaoAtual !== estado.requisicaoCotacao) return;
-      estado.cotacao = normalizarEstadoCotacao(dados.cotacao);
-      estado.sujo = false;
-      var rascunho = lerRascunhoLocal(estado.cotacao);
-      if (rascunho && Date.parse(rascunho.salvoEm) > Date.parse(estado.cotacao.atualizadoEm || 0)) {
-        if (window.confirm('Existe uma versão local mais recente desta cotação. Deseja recuperá-la?')) {
-          estado.cotacao = normalizarEstadoCotacao(rascunho.cotacao);
-          estado.sujo = true;
-        } else {
-          removerRascunhoLocal(estado.cotacao);
+    renderizarResumo();
+    atualizarStatusContagem();
+    if (foco) {
+      window.requestAnimationFrame(function () {
+        var seletor = foco.tipo === 'produto'
+          ? '[data-produto-descricao="' + escaparSeletor(foco.id) + '"]'
+          : '[data-fornecedor-nome="' + escaparSeletor(foco.id) + '"]';
+        var alvo = elementos.tabela.querySelector(seletor);
+        if (alvo) {
+          alvo.focus();
+          if (typeof alvo.select === 'function') alvo.select();
         }
-      }
-      renderizarEditor();
-      mostrarVista('editor');
-      if (imprimirDireto) abrirPreviewImpressao();
-    } catch (erro) {
-      if (requisicaoAtual !== estado.requisicaoCotacao) return;
-      if (erro.status !== 403) elementos.listaStatus.textContent = erro.message;
+      });
     }
   }
 
-  function iniciarNovaCotacao() {
-    cancelarAgendamentosEdicao();
-    estado.requisicaoCotacao += 1;
-    var cotacao = novaCotacao();
-    var rascunho = lerRascunhoLocal(cotacao);
-    if (rascunho) {
-      if (window.confirm('Há uma nova cotação não salva neste navegador. Deseja recuperá-la?')) cotacao = rascunho.cotacao;
-      else removerRascunhoLocal(cotacao);
-    }
-    estado.cotacao = normalizarEstadoCotacao(cotacao);
-    estado.sujo = Boolean(rascunho && cotacao === rascunho.cotacao);
-    renderizarEditor();
-    mostrarVista('editor');
+  function nomesFornecedores(ids) {
+    return ids.map(function (id) {
+      var fornecedor = fornecedorPorId(id);
+      return fornecedor ? fornecedor.nome : '';
+    }).filter(Boolean).join(', ');
   }
 
-  function preencherDadosGerais() {
-    var cotacao = estado.cotacao;
-    porId('cotacao-numero').value = cotacao.numero || '';
-    porId('cotacao-criada-em').value = formatarData(cotacao.criadoEm, true);
-    porId('cotacao-atualizada-em').value = formatarData(cotacao.atualizadoEm, true);
-    porId('cotacao-responsavel').value = nomeResponsavel(cotacao.responsavel);
-    document.querySelectorAll('[data-cotacao-field]').forEach(function (campo) {
-      campo.value = cotacao[campo.dataset.cotacaoField] || '';
-    });
-    document.querySelectorAll('[data-approval-field]').forEach(function (campo) {
-      campo.value = cotacao.aprovacao && cotacao.aprovacao[campo.dataset.approvalField] || '';
-    });
+  function renderizarResumo() {
+    if (!elementos.resumo || !calculos) return;
+    var recomendados = nomesFornecedores(calculos.fornecedoresRecomendados);
+    var textoRecomendado = recomendados || 'Nenhum fornecedor possui preços para todos os produtos.';
+    elementos.resumo.innerHTML = '' +
+      '<div class="cotacoes-summary-item cotacoes-summary-recommended"><span>Fornecedor recomendado</span><strong>' + escapar(textoRecomendado) + '</strong></div>' +
+      '<div class="cotacoes-summary-item"><span>Total recomendado</span><strong>' + Financeiro.formatarMoeda(calculos.totalRecomendadoCentavos) + '</strong></div>' +
+      '<div class="cotacoes-summary-item cotacoes-summary-discount"><span>Desconto sugerido</span><strong>' + Financeiro.formatarMoeda(calculos.descontoSugeridoCentavos) + '</strong></div>' +
+      '<div class="cotacoes-summary-item"><span>Percentual de negociação</span><strong>' + Financeiro.formatarPercentualBasisPoints(calculos.percentualNegociacaoBasisPoints) + '</strong></div>';
   }
 
-  function renderizarEditor() {
-    if (!estado.cotacao) return;
-    garantirMatriz(estado.cotacao);
-    preencherDadosGerais();
-    elementos.editorTitulo.textContent = estado.cotacao.numero || 'Nova cotação';
-    elementos.statusBadge.dataset.status = estado.cotacao.status;
-    elementos.statusBadge.textContent = STATUS[estado.cotacao.status] || estado.cotacao.status;
-    elementos.fieldset.disabled = !podeEditar();
-    renderizarFornecedores();
-    renderizarTabela();
-    recalcular();
-    atualizarCalculosNaTela();
-    atualizarBotoes();
-    definirEstadoSalvamento(estado.sujo ? 'dirty' : 'saved', estado.sujo ? 'Não salvo' : 'Salvo');
-  }
-
-  function campoFornecedor(id, campo, rotulo, tipo, valor, largo) {
-    return '<div class="cotacoes-field' + (largo ? ' cotacoes-field-wide' : '') + '">' +
-      '<label>' + escapar(rotulo) + '</label>' +
-      (tipo === 'textarea'
-        ? '<textarea rows="2" maxlength="3000" data-supplier-id="' + escapar(id) + '" data-supplier-field="' + campo + '" data-focus-key="fornecedor-' + escapar(id) + '-' + campo + '">' + escapar(valor || '') + '</textarea>'
-        : '<input type="' + tipo + '" value="' + escapar(valor || '') + '" data-supplier-id="' + escapar(id) + '" data-supplier-field="' + campo + '" data-focus-key="fornecedor-' + escapar(id) + '-' + campo + '">') +
-    '</div>';
-  }
-
-  function renderizarFornecedores() {
-    var calculos = estado.calculos || { fornecedores: [] };
-    var mapaCalculos = new Map((calculos.fornecedores || []).map(function (f) { return [String(f.fornecedorId), f]; }));
-    if (!estado.cotacao.fornecedores.length) {
-      elementos.fornecedores.innerHTML = '<div class="cotacoes-empty">Nenhum fornecedor cadastrado. Use “Adicionar fornecedor” para começar.</div>';
-      return;
-    }
-    elementos.fornecedores.innerHTML = estado.cotacao.fornecedores.map(function (fornecedor, indice) {
-      var calculo = mapaCalculos.get(String(fornecedor.id)) || {};
-      var completo = Boolean(calculo.completo);
-      var freteTexto = dinheiroParaEdicao(fornecedor.freteCentavos);
-      return '<article class="cotacoes-supplier-card" data-supplier-card="' + escapar(fornecedor.id) + '" data-incomplete="' + (!completo) + '" data-disabled="' + (fornecedor.ativoComparacao === false) + '">' +
-        '<div class="cotacoes-supplier-head"><span class="cotacoes-supplier-index">' + (indice + 1) + '</span>' +
-          '<span class="cotacoes-supplier-name" data-supplier-name="' + escapar(fornecedor.id) + '">' + escapar(nomeFornecedor(fornecedor)) + '</span>' +
-          '<span class="cotacoes-supplier-completeness" data-supplier-completeness="' + escapar(fornecedor.id) + '" data-complete="' + completo + '">' + (completo ? 'Completa' : 'Faltam ' + (calculo.itensFaltantes || estado.cotacao.itens.length)) + '</span>' +
-          '<div class="cotacoes-supplier-actions">' +
-            '<button class="cotacoes-icon-btn" type="button" data-supplier-action="up" data-id="' + escapar(fornecedor.id) + '" title="Mover para a esquerda"' + (indice === 0 ? ' disabled' : '') + '>←</button>' +
-            '<button class="cotacoes-icon-btn" type="button" data-supplier-action="down" data-id="' + escapar(fornecedor.id) + '" title="Mover para a direita"' + (indice === estado.cotacao.fornecedores.length - 1 ? ' disabled' : '') + '>→</button>' +
-            '<button class="cotacoes-icon-btn" type="button" data-supplier-action="duplicate" data-id="' + escapar(fornecedor.id) + '" title="Duplicar">⧉</button>' +
-            '<button class="cotacoes-icon-btn" type="button" data-supplier-action="delete" data-id="' + escapar(fornecedor.id) + '" title="Excluir">×</button>' +
-          '</div></div>' +
-        '<div class="cotacoes-supplier-fields">' +
-          campoFornecedor(fornecedor.id, 'nome', 'Nome de exibição', 'text', fornecedor.nome, false) +
-          campoFornecedor(fornecedor.id, 'cnpj', 'CNPJ', 'text', fornecedor.cnpj, false) +
-          campoFornecedor(fornecedor.id, 'nomeFantasia', 'Nome fantasia', 'text', fornecedor.nomeFantasia, false) +
-          campoFornecedor(fornecedor.id, 'razaoSocial', 'Razão social', 'text', fornecedor.razaoSocial, false) +
-          campoFornecedor(fornecedor.id, 'contato', 'Contato', 'text', fornecedor.contato, false) +
-          campoFornecedor(fornecedor.id, 'telefone', 'Telefone', 'tel', fornecedor.telefone, false) +
-          campoFornecedor(fornecedor.id, 'email', 'E-mail', 'email', fornecedor.email, false) +
-          campoFornecedor(fornecedor.id, 'formaPagamento', 'Forma de pagamento', 'text', fornecedor.formaPagamento, false) +
-          campoFornecedor(fornecedor.id, 'prazoEntrega', 'Prazo de entrega', 'text', fornecedor.prazoEntrega, false) +
-          campoFornecedor(fornecedor.id, 'validadeProposta', 'Validade da proposta', 'date', fornecedor.validadeProposta, false) +
-          '<div class="cotacoes-field"><label>Frete</label><input type="text" inputmode="decimal" value="' + escapar(freteTexto) + '" data-supplier-id="' + escapar(fornecedor.id) + '" data-supplier-field="freteCentavos" data-focus-key="fornecedor-' + escapar(fornecedor.id) + '-freteCentavos"></div>' +
-          '<label class="cotacoes-supplier-toggle"><input type="checkbox" data-supplier-id="' + escapar(fornecedor.id) + '" data-supplier-field="ativoComparacao"' + (fornecedor.ativoComparacao !== false ? ' checked' : '') + '> Incluir na comparação</label>' +
-          campoFornecedor(fornecedor.id, 'observacoes', 'Observações da proposta', 'textarea', fornecedor.observacoes, true) +
-        '</div></article>';
-    }).join('');
-  }
-
-  function renderizarTabela() {
-    var cotacao = estado.cotacao;
-    if (!cotacao.itens.length) {
-      elementos.tabelaWrap.innerHTML = '<table class="cotacoes-sheet-table"><tbody><tr><td class="cotacoes-sheet-empty">Nenhum item cadastrado. Adicione itens para montar a comparação.</td></tr></tbody></table>';
-      elementos.sheetStatus.textContent = '0 itens · ' + cotacao.fornecedores.length + ' fornecedores';
-      return;
-    }
-    var fornecedores = cotacao.fornecedores;
-    var precosTabela = mapaPrecos(cotacao);
-    var topo = fornecedores.map(function (fornecedor) {
-      return '<th class="cotacoes-supplier-group" colspan="2" data-supplier-heading="' + escapar(fornecedor.id) + '" data-disabled="' + (fornecedor.ativoComparacao === false) + '">' + escapar(nomeFornecedor(fornecedor)) + '</th>';
-    }).join('');
-    var sub = fornecedores.map(function () { return '<th class="cotacoes-col-supplier">Unitário</th><th class="cotacoes-col-supplier">Total</th>'; }).join('');
-    var linhas = cotacao.itens.map(function (item, indice) {
-      var colunas = fornecedores.map(function (fornecedor) {
-        var preco = precosTabela.get(chavePreco(item.id, fornecedor.id));
-        var textoPreco = dinheiroParaEdicao(preco.valorUnitarioCentavos);
-        var chave = chavePreco(item.id, fornecedor.id);
-        return '<td class="cotacoes-price-cell" data-price-cell="' + escapar(chave) + '" data-unavailable="' + (preco.indisponivel === true) + '">' +
-            '<input type="text" inputmode="decimal" value="' + escapar(textoPreco) + '" data-price-item="' + escapar(item.id) + '" data-price-supplier="' + escapar(fornecedor.id) + '" data-field="valorUnitarioCentavos" data-focus-key="preco-' + escapar(chave) + '"' + (preco.indisponivel ? ' disabled' : '') + ' aria-label="Preço de ' + escapar(item.descricao || 'item ' + (indice + 1)) + ' em ' + escapar(nomeFornecedor(fornecedor)) + '">' +
-            '<label class="cotacoes-unavailable-toggle"><input type="checkbox" data-price-item="' + escapar(item.id) + '" data-price-supplier="' + escapar(fornecedor.id) + '" data-field="indisponivel"' + (preco.indisponivel ? ' checked' : '') + '> indisponível</label>' +
-            '<input type="text" value="' + escapar(preco.observacao || '') + '" placeholder="Obs. do preço" maxlength="1000" style="min-height:22px;margin-top:3px;font-size:9px" data-price-item="' + escapar(item.id) + '" data-price-supplier="' + escapar(fornecedor.id) + '" data-field="observacao" data-focus-key="preco-obs-' + escapar(chave) + '" aria-label="Observação do preço">' +
-          '</td><td><span class="cotacoes-money-total" data-price-total="' + escapar(chave) + '">—</span></td>';
-      }).join('');
-      return '<tr data-item-row="' + escapar(item.id) + '">' +
-        '<td class="cotacoes-sticky cotacoes-col-number">' + (indice + 1) + '</td>' +
-        '<td class="cotacoes-sticky cotacoes-col-item"><div class="cotacoes-item-description">' +
-          '<input type="text" value="' + escapar(item.codigo || '') + '" placeholder="Código" data-item-id="' + escapar(item.id) + '" data-item-field="codigo" data-focus-key="item-' + escapar(item.id) + '-codigo">' +
-          '<input type="text" value="' + escapar(item.descricao || '') + '" placeholder="Descrição *" data-item-id="' + escapar(item.id) + '" data-item-field="descricao" data-focus-key="item-' + escapar(item.id) + '-descricao">' +
-          '<input type="text" value="' + escapar(item.observacao || '') + '" placeholder="Observação" data-item-id="' + escapar(item.id) + '" data-item-field="observacao" data-focus-key="item-' + escapar(item.id) + '-observacao" style="grid-column:1/-1">' +
-        '</div></td>' +
-        '<td class="cotacoes-sticky cotacoes-col-unit"><input type="text" value="' + escapar(item.unidade || 'UN') + '" maxlength="20" data-item-id="' + escapar(item.id) + '" data-item-field="unidade" data-focus-key="item-' + escapar(item.id) + '-unidade"></td>' +
-        '<td class="cotacoes-sticky cotacoes-col-quantity"><input type="text" inputmode="decimal" value="' + escapar(quantidade(item.quantidadeMillesimos).replace(/\./g, '')) + '" data-item-id="' + escapar(item.id) + '" data-item-field="quantidadeMillesimos" data-focus-key="item-' + escapar(item.id) + '-quantidade"></td>' +
-        colunas +
-        '<td class="cotacoes-col-ideal"><span class="cotacoes-money-total" data-ideal-unit="' + escapar(item.id) + '">—</span></td>' +
-        '<td class="cotacoes-col-ideal"><span class="cotacoes-money-total" data-ideal-total="' + escapar(item.id) + '">—</span></td>' +
-        '<td class="cotacoes-col-actions"><div class="cotacoes-row-actions">' +
-          '<button class="cotacoes-icon-btn" type="button" data-item-action="up" data-id="' + escapar(item.id) + '" title="Mover para cima"' + (indice === 0 ? ' disabled' : '') + '>↑</button>' +
-          '<button class="cotacoes-icon-btn" type="button" data-item-action="down" data-id="' + escapar(item.id) + '" title="Mover para baixo"' + (indice === cotacao.itens.length - 1 ? ' disabled' : '') + '>↓</button>' +
-          '<button class="cotacoes-icon-btn" type="button" data-item-action="duplicate" data-id="' + escapar(item.id) + '" title="Duplicar">⧉</button>' +
-          '<button class="cotacoes-icon-btn" type="button" data-item-action="delete" data-id="' + escapar(item.id) + '" title="Excluir">×</button>' +
-        '</div></td></tr>';
-    }).join('');
-    var totalFornecedor = fornecedores.map(function (fornecedor) {
-      return '<td colspan="2"><span class="cotacoes-money-total" data-supplier-total="' + escapar(fornecedor.id) + '">—</span></td>';
-    }).join('');
-    elementos.tabelaWrap.innerHTML = '<table class="cotacoes-sheet-table"><thead><tr>' +
-      '<th rowspan="2" class="cotacoes-sticky cotacoes-col-number">#</th><th rowspan="2" class="cotacoes-sticky cotacoes-col-item">Item</th><th rowspan="2" class="cotacoes-sticky cotacoes-col-unit">Un.</th><th rowspan="2" class="cotacoes-sticky cotacoes-col-quantity">Qtd.</th>' + topo +
-      '<th colspan="2" class="cotacoes-col-ideal">Custo ideal</th><th rowspan="2" class="cotacoes-col-actions">Ações</th></tr><tr>' + sub + '<th class="cotacoes-col-ideal">Unitário</th><th class="cotacoes-col-ideal">Total</th></tr></thead>' +
-      '<tbody>' + linhas + '</tbody><tfoot><tr class="cotacoes-totals-row"><th colspan="4" class="cotacoes-sticky">Total geral (com frete)</th>' + totalFornecedor + '<td colspan="2" class="cotacoes-col-ideal" data-ideal-grand-total>—</td><td></td></tr></tfoot></table>';
-    elementos.sheetStatus.textContent = cotacao.itens.length + ' itens · ' + fornecedores.length + ' fornecedores · ' + (cotacao.itens.length * fornecedores.length) + ' preços possíveis';
-  }
-
-  function recalcular() {
-    try {
-      estado.calculos = Financeiro.calcularCotacao(estado.cotacao || { itens: [], fornecedores: [], precos: [] });
-    } catch (erro) {
-      estado.calculos = null;
-      if (elementos.analise) elementos.analise.textContent = 'Não foi possível calcular: ' + erro.message;
-    }
-    return estado.calculos;
-  }
-
-  function agendarCalculoUI(itemId, calculoCompleto) {
-    if (calculoCompleto) estado.calculoCompletoPendente = true;
-    else if (itemId !== undefined && itemId !== null) estado.itensCalculoPendentes.add(String(itemId));
-    if (estado.frameCalculo) window.cancelAnimationFrame(estado.frameCalculo);
-    estado.frameCalculo = window.requestAnimationFrame(function () {
-      estado.frameCalculo = null;
-      var itensPendentes = estado.calculoCompletoPendente ? null : new Set(estado.itensCalculoPendentes);
-      estado.calculoCompletoPendente = false;
-      estado.itensCalculoPendentes.clear();
-      recalcular();
-      atualizarCalculosNaTela(itensPendentes);
-    });
-  }
-
-  function atualizarCalculosNaTela(idsItens) {
-    var calculos = estado.calculos;
-    if (!calculos) return;
-    var atualizarTudo = idsItens === undefined || idsItens === null;
-    var precosOriginais = estado.indicePrecos.size ? estado.indicePrecos : mapaPrecos(estado.cotacao);
-    var totaisFornecedores = new Map(Array.from(elementos.tabelaWrap.querySelectorAll('[data-supplier-total]')).map(function (el) { return [el.dataset.supplierTotal, el]; }));
-    var completudes = new Map(Array.from(elementos.fornecedores.querySelectorAll('[data-supplier-completeness]')).map(function (el) { return [el.dataset.supplierCompleteness, el]; }));
-    var cards = new Map(Array.from(elementos.fornecedores.querySelectorAll('[data-supplier-card]')).map(function (el) { return [el.dataset.supplierCard, el]; }));
-    var cabecalhos = new Map(Array.from(elementos.tabelaWrap.querySelectorAll('[data-supplier-heading]')).map(function (el) { return [el.dataset.supplierHeading, el]; }));
-    calculos.itens.forEach(function (item) {
-      if (!atualizarTudo && !idsItens.has(String(item.itemId))) return;
-      var linha = elementos.tabelaWrap.querySelector('[data-item-row="' + escaparSeletor(item.itemId) + '"]');
-      if (!linha) return;
-      var idealUnit = linha.querySelector('[data-ideal-unit]');
-      var idealTotal = linha.querySelector('[data-ideal-total]');
-      if (idealUnit) idealUnit.textContent = dinheiro(item.custoIdealUnitarioCentavos);
-      if (idealTotal) idealTotal.textContent = dinheiro(item.custoIdealTotalCentavos);
-      var celulasPreco = new Map(Array.from(linha.querySelectorAll('[data-price-cell]')).map(function (el) { return [el.dataset.priceCell, el]; }));
-      var totaisPreco = new Map(Array.from(linha.querySelectorAll('[data-price-total]')).map(function (el) { return [el.dataset.priceTotal, el]; }));
-      item.precos.forEach(function (preco) {
-        var chave = chavePreco(item.itemId, preco.fornecedorId);
-        var celula = celulasPreco.get(chave);
-        var total = totaisPreco.get(chave);
-        var original = precosOriginais.get(chave) || {};
+  function atualizarCalculosNaTabela() {
+    calculos = Modelo.calcular(estado);
+    calculos.produtos.forEach(function (produto) {
+      estado.fornecedores.forEach(function (fornecedor) {
+        var chave = Modelo.chavePreco(produto.produtoId, fornecedor.id);
+        var seletorChave = escaparSeletor(chave);
+        var preco = produto.porFornecedor[fornecedor.id];
+        var celula = elementos.tabela.querySelector('[data-preco-celula="' + seletorChave + '"]');
+        var total = elementos.tabela.querySelector('[data-total-chave="' + seletorChave + '"]');
+        var input = elementos.tabela.querySelector('[data-preco-chave="' + seletorChave + '"]');
         if (celula) {
-          celula.dataset.best = String(preco.menorPreco === true);
-          celula.dataset.unavailable = String(original.indisponivel === true);
+          celula.dataset.best = String(Boolean(preco.menorPreco));
+          var marcador = celula.querySelector('.cotacoes-best-marker');
+          if (marcador) marcador.hidden = !preco.menorPreco;
         }
-        if (total) total.textContent = dinheiro(preco.valorTotalCentavos);
+        if (total) total.textContent = Financeiro.formatarMoeda(preco.valorTotalCentavos, '');
+        if (input) {
+          input.setAttribute('aria-label', 'Valor unitário de ' +
+            (estado.produtos.find(function (registro) { return registro.id === produto.produtoId; }).descricao || 'produto sem descrição') +
+            ' em ' + fornecedor.nome + (preco.menorPreco ? '. Menor preço desta linha' : ''));
+        }
       });
+      var idealUnitario = elementos.tabela.querySelector('[data-ideal-unitario="' + escaparSeletor(produto.produtoId) + '"]');
+      var idealTotal = elementos.tabela.querySelector('[data-ideal-total="' + escaparSeletor(produto.produtoId) + '"]');
+      if (idealUnitario) idealUnitario.textContent = Financeiro.formatarMoeda(produto.menorValorUnitarioCentavos, '');
+      if (idealTotal) idealTotal.textContent = Financeiro.formatarMoeda(produto.custoIdealTotalCentavos, '');
     });
     calculos.fornecedores.forEach(function (fornecedor) {
-      var total = totaisFornecedores.get(String(fornecedor.fornecedorId));
-      if (total) total.textContent = dinheiro(fornecedor.totalCentavos);
-      var completude = completudes.get(String(fornecedor.fornecedorId));
-      var card = cards.get(String(fornecedor.fornecedorId));
-      var cabecalho = cabecalhos.get(String(fornecedor.fornecedorId));
+      var total = elementos.tabela.querySelector('[data-total-fornecedor="' + escaparSeletor(fornecedor.fornecedorId) + '"]');
+      var completude = elementos.tabela.querySelector('[data-completude-fornecedor="' + escaparSeletor(fornecedor.fornecedorId) + '"]');
+      if (total) total.textContent = Financeiro.formatarMoeda(fornecedor.totalCentavos, 'R$ 0,00');
       if (completude) {
         completude.dataset.complete = String(fornecedor.completo);
-        completude.textContent = fornecedor.completo ? 'Completa' : 'Faltam ' + fornecedor.itensFaltantes;
+        completude.textContent = fornecedor.completo
+          ? 'Cotação completa'
+          : fornecedor.faltantes + (fornecedor.faltantes === 1 ? ' preço pendente' : ' preços pendentes');
       }
-      if (card) {
-        card.dataset.incomplete = String(!fornecedor.completo);
-        card.dataset.disabled = String(!fornecedor.ativoComparacao);
-      }
-      if (cabecalho) cabecalho.dataset.disabled = String(!fornecedor.ativoComparacao);
     });
-    var idealGeral = elementos.tabelaWrap.querySelector('[data-ideal-grand-total]');
-    if (idealGeral) idealGeral.textContent = dinheiro(calculos.custoIdealTotalCentavos);
-    atualizarResumo();
+    var custoIdeal = elementos.tabela.querySelector('[data-custo-ideal-total]');
+    if (custoIdeal) custoIdeal.textContent = Financeiro.formatarMoeda(calculos.custoIdealTotalCentavos, '');
+    renderizarResumo();
   }
 
-  function atualizarResumo() {
-    var calculos = estado.calculos;
-    if (!calculos) return;
-    var mapa = new Map(estado.cotacao.fornecedores.map(function (f) { return [String(f.id), f]; }));
-    var recomendados = calculos.fornecedorIdsRecomendados.map(function (id) { return nomeFornecedor(mapa.get(String(id))); });
-    elementos.resumo.innerHTML =
-      '<article class="cotacoes-summary-card" data-tone="primary"><span class="cotacoes-summary-label">Custo ideal</span><strong class="cotacoes-summary-value">' + escapar(dinheiro(calculos.custoIdealTotalCentavos)) + '</strong><small class="cotacoes-summary-note">Soma dos menores preços por item</small></article>' +
-      '<article class="cotacoes-summary-card" data-tone="success"><span class="cotacoes-summary-label">Fornecedor recomendado</span><strong class="cotacoes-summary-value" title="' + escapar(recomendados.join(' / ')) + '">' + escapar(recomendados.join(' / ') || 'Nenhum completo') + '</strong><small class="cotacoes-summary-note">Menor proposta completa com frete</small></article>' +
-      '<article class="cotacoes-summary-card"><span class="cotacoes-summary-label">Total recomendado</span><strong class="cotacoes-summary-value">' + escapar(dinheiro(calculos.totalRecomendadoCentavos)) + '</strong><small class="cotacoes-summary-note">Fornecedor completo de menor total</small></article>' +
-      '<article class="cotacoes-summary-card"><span class="cotacoes-summary-label">Potencial de negociação</span><strong class="cotacoes-summary-value">' + escapar(dinheiro(calculos.descontoSugeridoCentavos)) + '</strong><small class="cotacoes-summary-note">' + escapar(Financeiro.formatarBasisPoints(calculos.percentualNegociacaoBasisPoints)) + ' sobre o recomendado</small></article>' +
-      '<article class="cotacoes-summary-card"><span class="cotacoes-summary-label">Cobertura da cotação</span><strong class="cotacoes-summary-value">' + escapar(calculos.contadores.itens) + ' itens · ' + escapar(calculos.contadores.fornecedores) + ' fornecedores</strong><small class="cotacoes-summary-note">' + escapar(calculos.contadores.fornecedoresCompletos) + ' completos · ' + escapar(calculos.contadores.fornecedoresIncompletos) + ' incompletos</small></article>';
-    elementos.analise.textContent = calculos.analiseTextual || 'Adicione itens, fornecedores e preços para gerar a análise.';
+  function adicionarProduto() {
+    if (!autorizarOuNegar()) return;
+    var produto = Modelo.adicionarProduto(estado, { quantidadeMillesimos: 1000 });
+    renderizarTabela({ tipo: 'produto', id: produto.id });
+    mostrarStatus('Produto adicionado. Preencha a descrição e a quantidade.', 'success', true);
   }
 
-  function atualizarBotoes() {
-    var editavel = podeEditar();
-    var existe = Boolean(estado.cotacao && estado.cotacao.id);
-    var ocupado = estado.salvando || estado.acaoEmCurso;
-    elementos.salvar.disabled = !editavel || ocupado;
-    elementos.finalizar.disabled = !editavel || ocupado;
-    elementos.imprimir.disabled = !estado.cotacao || ocupado;
-    elementos.duplicar.disabled = !existe || ocupado;
-    elementos.cancelar.disabled = !existe || !editavel || ocupado;
-    elementos.excluir.disabled = !existe || !editavel || ocupado;
-    elementos.adicionarItem.disabled = !editavel || estado.acaoEmCurso;
-    elementos.adicionarFornecedor.disabled = !editavel || estado.acaoEmCurso;
-    elementos.voltar.disabled = ocupado;
-    elementos.fieldset.disabled = !editavel || estado.acaoEmCurso;
-  }
-
-  function iniciarAcao() {
-    if (estado.acaoEmCurso) return false;
-    estado.acaoEmCurso = true;
-    atualizarBotoes();
-    return true;
-  }
-
-  function encerrarAcao() {
-    estado.acaoEmCurso = false;
-    atualizarBotoes();
-  }
-
-  function alterarOrdem(lista, id, direcao) {
-    var indice = lista.findIndex(function (entidade) { return String(entidade.id) === String(id); });
-    var destino = indice + direcao;
-    if (indice < 0 || destino < 0 || destino >= lista.length) return;
-    var temporario = lista[indice];
-    lista[indice] = lista[destino];
-    lista[destino] = temporario;
-    lista.forEach(function (entidade, ordem) { entidade.ordem = ordem; });
-  }
-
-  function precosPreenchidosPorItem(id) {
-    return estado.cotacao.precos.filter(function (preco) {
-      return String(preco.itemId) === String(id) && (Number.isSafeInteger(preco.valorUnitarioCentavos) || preco.indisponivel || preco.observacao);
-    }).length;
-  }
-
-  function precosPreenchidosPorFornecedor(id) {
-    return estado.cotacao.precos.filter(function (preco) {
-      return String(preco.fornecedorId) === String(id) && (Number.isSafeInteger(preco.valorUnitarioCentavos) || preco.indisponivel || preco.observacao);
-    }).length;
-  }
-
-  function acaoItem(acao, id) {
-    if (!podeEditar()) return;
-    var indice = estado.cotacao.itens.findIndex(function (item) { return String(item.id) === String(id); });
-    if (indice < 0) return;
-    if (acao === 'up' || acao === 'down') alterarOrdem(estado.cotacao.itens, id, acao === 'up' ? -1 : 1);
-    if (acao === 'duplicate') {
-      var original = estado.cotacao.itens[indice];
-      var duplicado = novoItem(original);
-      estado.cotacao.itens.splice(indice + 1, 0, duplicado);
-      estado.cotacao.fornecedores.forEach(function (fornecedor) {
-        var origem = obterPreco(original.id, fornecedor.id);
-        estado.cotacao.precos.push({ id: idTemporario('preco'), itemId: duplicado.id, fornecedorId: fornecedor.id, valorUnitarioCentavos: origem.valorUnitarioCentavos, observacao: origem.observacao || '', indisponivel: origem.indisponivel === true });
-      });
-    }
-    if (acao === 'delete') {
-      var preenchidos = precosPreenchidosPorItem(id);
-      if (!window.confirm(preenchidos ? 'Este item possui ' + preenchidos + ' preço(s) preenchido(s), que também serão excluídos. Continuar?' : 'Excluir este item?')) return;
-      estado.cotacao.itens.splice(indice, 1);
-      estado.cotacao.precos = estado.cotacao.precos.filter(function (preco) { return String(preco.itemId) !== String(id); });
-    }
-    garantirMatriz(estado.cotacao);
-    marcarSujo();
-    renderizarTabela();
-    recalcular();
-    atualizarCalculosNaTela();
-  }
-
-  function acaoFornecedor(acao, id) {
-    if (!podeEditar()) return;
-    var indice = estado.cotacao.fornecedores.findIndex(function (f) { return String(f.id) === String(id); });
-    if (indice < 0) return;
-    if (acao === 'up' || acao === 'down') alterarOrdem(estado.cotacao.fornecedores, id, acao === 'up' ? -1 : 1);
-    if (acao === 'duplicate') {
-      var original = estado.cotacao.fornecedores[indice];
-      var duplicado = novoFornecedor(original);
-      estado.cotacao.fornecedores.splice(indice + 1, 0, duplicado);
-      estado.cotacao.itens.forEach(function (item) {
-        var origem = obterPreco(item.id, original.id);
-        estado.cotacao.precos.push({ id: idTemporario('preco'), itemId: item.id, fornecedorId: duplicado.id, valorUnitarioCentavos: origem.valorUnitarioCentavos, observacao: origem.observacao || '', indisponivel: origem.indisponivel === true });
-      });
-    }
-    if (acao === 'delete') {
-      var preenchidos = precosPreenchidosPorFornecedor(id);
-      if (!window.confirm(preenchidos ? 'Este fornecedor possui ' + preenchidos + ' preço(s) preenchido(s), que também serão excluídos. Continuar?' : 'Excluir este fornecedor?')) return;
-      estado.cotacao.fornecedores.splice(indice, 1);
-      estado.cotacao.precos = estado.cotacao.precos.filter(function (preco) { return String(preco.fornecedorId) !== String(id); });
-    }
-    garantirMatriz(estado.cotacao);
-    marcarSujo();
-    renderizarFornecedores();
-    renderizarTabela();
-    recalcular();
-    atualizarCalculosNaTela();
-  }
-
-  async function duplicarAtual() {
-    if (!estado.cotacao || !estado.cotacao.id) return;
-    if (!iniciarAcao()) return;
-    try {
-      if (estado.sujo) await salvarCotacao({ automatico: false });
-      if (estado.sujo) {
-        mostrarErroGeral(['Houve novas alterações durante o salvamento. Aguarde o autosave antes de duplicar.']);
-        return;
-      }
-      if (!window.confirm('Criar uma nova cotação com os mesmos dados?')) return;
-      var dados = await chamarApi('/' + encodeURIComponent(estado.cotacao.id) + '/duplicar', { method: 'POST', body: {} });
-      estado.requisicaoCotacao += 1;
-      estado.cotacao = normalizarEstadoCotacao(dados.cotacao);
-      estado.sujo = false;
-      renderizarEditor();
-      mostrarVista('editor');
-    } catch (erro) {
-      mostrarErroGeral(mensagemErro(erro));
-    } finally {
-      encerrarAcao();
-    }
-  }
-
-  async function finalizarAtual() {
-    var erros = validarCotacao(true);
-    mostrarErroGeral(erros);
-    if (erros.length) return;
-    if (!iniciarAcao()) return;
-    try {
-      if (estado.sujo || !estado.cotacao.id) await salvarCotacao({ automatico: false });
-      if (estado.sujo) {
-        mostrarErroGeral(['Houve novas alterações durante o salvamento. Aguarde o autosave antes de finalizar.']);
-        return;
-      }
-      if (!window.confirm('Finalizar esta cotação? Depois disso ela ficará somente para leitura e impressão.')) return;
-      var dados = await chamarApi('/' + encodeURIComponent(estado.cotacao.id) + '/finalizar', { method: 'POST', body: {} });
-      estado.cotacao = normalizarEstadoCotacao(dados.cotacao);
-      estado.sujo = false;
-      removerRascunhoLocal(estado.cotacao);
-      renderizarEditor();
-    } catch (erro) {
-      mostrarErroGeral(mensagemErro(erro));
-    } finally {
-      encerrarAcao();
-    }
-  }
-
-  async function cancelarAtual() {
-    if (!estado.cotacao || !estado.cotacao.id || !podeEditar()) return;
-    var motivo = window.prompt('Motivo do cancelamento (opcional):', '');
-    if (motivo === null || !window.confirm('Confirmar o cancelamento desta cotação?')) return;
-    if (!iniciarAcao()) return;
-    try {
-      var dados = await chamarApi('/' + encodeURIComponent(estado.cotacao.id) + '/cancelar', { method: 'POST', body: { motivo: motivo } });
-      estado.cotacao = normalizarEstadoCotacao(dados.cotacao);
-      estado.sujo = false;
-      removerRascunhoLocal(estado.cotacao);
-      renderizarEditor();
-    } catch (erro) {
-      mostrarErroGeral(mensagemErro(erro));
-    } finally {
-      encerrarAcao();
-    }
-  }
-
-  async function excluirPorId(id, voltar) {
-    if (!window.confirm('Excluir definitivamente esta cotação em andamento? Esta ação não pode ser desfeita.')) return;
-    if (!iniciarAcao()) return;
-    try {
-      await chamarApi('/' + encodeURIComponent(id), { method: 'DELETE' });
-      if (estado.cotacao && String(estado.cotacao.id) === String(id)) removerRascunhoLocal(estado.cotacao);
-      if (voltar) {
-        estado.requisicaoCotacao += 1;
-        estado.cotacao = null;
-        estado.sujo = false;
-        mostrarVista('historico');
-      }
-      await carregarHistorico(estado.pagina);
-    } catch (erro) {
-      if (voltar) mostrarErroGeral(mensagemErro(erro));
-      else elementos.listaStatus.textContent = erro.message;
-    } finally {
-      encerrarAcao();
-    }
-  }
-
-  function fornecedoresSelecionadosImpressao() {
-    return Array.from(elementos.printFornecedores.querySelectorAll('input[type="checkbox"]:checked')).map(function (campo) { return campo.value; });
-  }
-
-  function atualizarDocumentoImpressao() {
-    if (!estado.cotacao || !PrintView) return;
-    elementos.printDocument.innerHTML = PrintView.renderizar(estado.cotacao, {
-      fornecedorIds: fornecedoresSelecionadosImpressao(),
-      incluirObservacoes: elementos.printObservacoes.checked,
-      incluirAssinaturas: elementos.printAssinaturas.checked,
-      incluirFornecedoresIncompletos: elementos.printIncompletos.checked
-    });
-  }
-
-  function abrirPreviewImpressao() {
-    if (!estado.cotacao || !PrintView) {
-      mostrarErroGeral(['O componente de impressão não está disponível.']);
+  function adicionarFornecedor() {
+    if (!autorizarOuNegar()) return;
+    var nome = window.prompt('Nome do fornecedor:');
+    if (nome === null) return;
+    nome = nome.trim();
+    if (!nome) {
+      mostrarStatus('Informe o nome do fornecedor.', 'error', true);
       return;
     }
-    elementos.printFornecedores.innerHTML = estado.cotacao.fornecedores.map(function (fornecedor) {
-      return '<label><input type="checkbox" value="' + escapar(fornecedor.id) + '" checked> ' + escapar(nomeFornecedor(fornecedor)) + '</label>';
-    }).join('') || '<span>Nenhum fornecedor cadastrado.</span>';
-    atualizarDocumentoImpressao();
-    elementos.printPreview.hidden = false;
-    estado.imprimindo = true;
-    elementos.printFechar.focus();
-  }
-
-  async function prepararPreviewAtual() {
-    if (!estado.cotacao || !iniciarAcao()) return;
-    var cotacaoReferencia = estado.cotacao;
-    var geracaoCotacao = estado.requisicaoCotacao;
-    try {
-      if (estado.sujo || !estado.cotacao.id) await salvarCotacao({ automatico: false });
-      if (geracaoCotacao !== estado.requisicaoCotacao) return;
-      cotacaoReferencia = estado.cotacao;
-      if (estado.sujo || !estado.cotacao.id) {
-        mostrarErroGeral(['Conclua o salvamento da cotação antes de gerar o documento.']);
-        return;
-      }
-      var dados = await chamarApi('/' + encodeURIComponent(estado.cotacao.id) + '/impressao');
-      if (geracaoCotacao !== estado.requisicaoCotacao || estado.cotacao !== cotacaoReferencia) return;
-      estado.cotacao = normalizarEstadoCotacao(dados.cotacao);
-      estado.sujo = false;
-      renderizarEditor();
-      abrirPreviewImpressao();
-    } catch (erro) {
-      mostrarErroGeral(mensagemErro(erro));
-    } finally {
-      encerrarAcao();
+    var duplicado = estado.fornecedores.some(function (fornecedor) {
+      return fornecedor.nome.toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR');
+    });
+    if (duplicado) {
+      mostrarStatus('Já existe um fornecedor com esse nome.', 'error', true);
+      return;
     }
+    var fornecedor = Modelo.adicionarFornecedor(estado, nome);
+    renderizarTabela({ tipo: 'fornecedor', id: fornecedor.id });
+    mostrarStatus('Fornecedor adicionado à planilha.', 'success', true);
   }
 
-  function fecharPreviewImpressao() {
-    elementos.printPreview.hidden = true;
-    document.body.classList.remove('cotacoes-printing');
-    estado.imprimindo = false;
+  function removerFornecedor(fornecedorId) {
+    var fornecedor = fornecedorPorId(fornecedorId);
+    if (!fornecedor) return;
+    var possuiPrecos = estado.produtos.some(function (produto) {
+      return Number.isSafeInteger(estado.precos[Modelo.chavePreco(produto.id, fornecedorId)]) &&
+        estado.precos[Modelo.chavePreco(produto.id, fornecedorId)] > 0;
+    });
+    if (possuiPrecos && !window.confirm('Remover ' + fornecedor.nome + '? Todos os preços informados para ele serão removidos.')) return;
+    Modelo.removerFornecedor(estado, fornecedorId);
+    renderizarTabela();
+    mostrarStatus('Fornecedor removido.', 'success', true);
   }
 
-  function executarImpressao() {
-    atualizarDocumentoImpressao();
+  function removerProduto(produtoId) {
+    Modelo.removerProduto(estado, produtoId);
+    renderizarTabela();
+    mostrarStatus('Produto removido.', 'success', true);
+  }
+
+  function duplicarProduto(produtoId) {
+    var duplicado = Modelo.duplicarProduto(estado, produtoId);
+    renderizarTabela({ tipo: 'produto', id: duplicado.id });
+    mostrarStatus('Produto duplicado com seus preços.', 'success', true);
+  }
+
+  function limparTabela() {
+    if (!autorizarOuNegar()) return;
+    if ((estado.produtos.length || estado.fornecedores.length) &&
+        !window.confirm('Limpar toda a tabela? Produtos, fornecedores e preços serão perdidos.')) return;
+    Modelo.limparEstado(estado);
+    sincronizarCamposImpressao();
+    renderizarTabela();
+    mostrarStatus('Tabela limpa.', 'success', true);
+  }
+
+  function sincronizarCamposImpressao() {
+    var mapa = {
+      numero: elementos.numero,
+      descricao: elementos.descricao,
+      elaboradoPor: elementos.elaboradoPor,
+      aprovadoPor: elementos.aprovadoPor,
+      data: elementos.data
+    };
+    Object.keys(mapa).forEach(function (campo) {
+      if (mapa[campo]) mapa[campo].value = estado.impressao[campo] || '';
+    });
+  }
+
+  function abrirPrevia() {
+    if (!autorizarOuNegar()) return;
+    if (!estado.produtos.length || !estado.fornecedores.length) {
+      mostrarStatus('Adicione ao menos um produto e um fornecedor antes de imprimir.', 'error', true);
+      return;
+    }
+    calculos = Modelo.calcular(estado);
+    focoAntesDaPrevia = document.activeElement;
+    elementos.documentoImpressao.innerHTML = PrintView.renderizar(estado, {
+      emitidoEm: new Date().toISOString()
+    });
+    elementos.previa.hidden = false;
+    document.body.classList.add('cotacoes-preview-open');
+    elementos.fecharPrevia.focus();
+  }
+
+  function fecharPrevia() {
+    if (!elementos.previa || elementos.previa.hidden) return;
+    elementos.previa.hidden = true;
+    document.body.classList.remove('cotacoes-preview-open', 'cotacoes-printing');
+    if (focoAntesDaPrevia && typeof focoAntesDaPrevia.focus === 'function') focoAntesDaPrevia.focus();
+    focoAntesDaPrevia = null;
+  }
+
+  function imprimir() {
+    if (!autorizarOuNegar()) return;
     document.body.classList.add('cotacoes-printing');
-    window.setTimeout(function () { window.print(); }, 30);
+    window.print();
+    window.setTimeout(function () { document.body.classList.remove('cotacoes-printing'); }, 0);
   }
 
-  function aoInputEditor(evento) {
-    if (!estado.cotacao || !podeEditar()) return;
+  function focaveisPrevia() {
+    return Array.prototype.slice.call(elementos.previa.querySelectorAll(
+      'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(function (elemento) { return !elemento.hidden; });
+  }
+
+  function aoDigitarTabela(evento) {
     var alvo = evento.target;
-    if (alvo.dataset.cotacaoField) {
-      estado.cotacao[alvo.dataset.cotacaoField] = alvo.value;
-      marcarSujo();
+    if (alvo.matches('[data-produto-descricao]')) {
+      Modelo.definirProduto(estado, alvo.dataset.produtoDescricao, { descricao: alvo.value });
       return;
     }
-    if (alvo.dataset.approvalField) {
-      estado.cotacao.aprovacao = estado.cotacao.aprovacao || {};
-      estado.cotacao.aprovacao[alvo.dataset.approvalField] = alvo.value;
-      marcarSujo();
+    if (alvo.matches('[data-produto-quantidade]')) {
+      var quantidade = Financeiro.parseQuantidadeMillesimos(alvo.value);
+      var quantidadeValida = Number.isSafeInteger(quantidade) && quantidade > 0;
+      alvo.setAttribute('aria-invalid', String(Boolean(alvo.value.trim()) && !quantidadeValida));
+      Modelo.definirProduto(estado, alvo.dataset.produtoQuantidade, {
+        quantidadeMillesimos: quantidadeValida ? quantidade : null
+      });
+      atualizarCalculosNaTabela();
       return;
     }
-    if (alvo.dataset.itemId) {
-      var item = estado.cotacao.itens.find(function (entrada) { return String(entrada.id) === String(alvo.dataset.itemId); });
-      if (!item) return;
-      if (alvo.dataset.itemField === 'quantidadeMillesimos') {
-        item.quantidadeMillesimos = Financeiro.parseQuantidadeParaMillesimos(alvo.value);
-        alvo.setAttribute('aria-invalid', String(item.quantidadeMillesimos === null || item.quantidadeMillesimos <= 0));
-        agendarCalculoUI(item.id, false);
-      } else {
-        item[alvo.dataset.itemField] = alvo.value;
-      }
-      marcarSujo();
+    if (alvo.matches('[data-preco-chave]')) {
+      var centavos = Financeiro.parseMoedaCentavos(alvo.value);
+      var invalido = Boolean(alvo.value.trim()) && centavos === null;
+      alvo.setAttribute('aria-invalid', String(invalido));
+      Modelo.definirPreco(
+        estado,
+        alvo.dataset.produtoId,
+        alvo.dataset.fornecedorId,
+        Number.isSafeInteger(centavos) && centavos > 0 ? centavos : null
+      );
+      atualizarCalculosNaTabela();
       return;
     }
-    if (alvo.dataset.supplierId) {
-      var fornecedor = estado.cotacao.fornecedores.find(function (entrada) { return String(entrada.id) === String(alvo.dataset.supplierId); });
-      if (!fornecedor) return;
-      var campo = alvo.dataset.supplierField;
-      if (campo === 'freteCentavos') {
-        fornecedor[campo] = Financeiro.parseMoedaParaCentavos(alvo.value);
-        alvo.setAttribute('aria-invalid', String(fornecedor[campo] === null || fornecedor[campo] < 0));
-        agendarCalculoUI(null, false);
-      } else if (campo === 'ativoComparacao') {
-        fornecedor[campo] = alvo.checked;
-        var cabecalho = elementos.tabelaWrap.querySelector('[data-supplier-heading="' + escaparSeletor(fornecedor.id) + '"]');
-        if (cabecalho) cabecalho.dataset.disabled = String(!fornecedor[campo]);
-        agendarCalculoUI(null, true);
-      } else {
-        fornecedor[campo] = alvo.value;
-        if (campo === 'nome' || campo === 'nomeFantasia' || campo === 'razaoSocial') {
-          var nome = nomeFornecedor(fornecedor);
-          elementos.editor.querySelectorAll('[data-supplier-name="' + escaparSeletor(fornecedor.id) + '"],[data-supplier-heading="' + escaparSeletor(fornecedor.id) + '"]').forEach(function (el) { el.textContent = nome; });
-          atualizarResumo();
-        }
-      }
-      marcarSujo();
-      return;
-    }
-    if (alvo.dataset.priceItem) {
-      var preco = obterPreco(alvo.dataset.priceItem, alvo.dataset.priceSupplier);
-      if (alvo.dataset.field === 'indisponivel') {
-        preco.indisponivel = alvo.checked;
-        var celula = alvo.closest('.cotacoes-price-cell');
-        var campoPreco = celula && celula.querySelector('[data-field="valorUnitarioCentavos"]');
-        if (campoPreco) campoPreco.disabled = preco.indisponivel;
-      } else if (alvo.dataset.field === 'observacao') {
-        preco.observacao = alvo.value;
-      } else {
-        preco.valorUnitarioCentavos = Financeiro.parseMoedaParaCentavos(alvo.value);
-        preco._valorDigitado = alvo.value;
-        alvo.setAttribute('aria-invalid', String(alvo.value.trim() && (preco.valorUnitarioCentavos === null || preco.valorUnitarioCentavos <= 0)));
-      }
-      marcarSujo();
-      if (alvo.dataset.field !== 'observacao') agendarCalculoUI(preco.itemId, false);
+    if (alvo.matches('[data-fornecedor-nome]') && alvo.value.trim()) {
+      Modelo.renomearFornecedor(estado, alvo.dataset.fornecedorNome, alvo.value);
+      renderizarResumo();
     }
   }
 
-  function aoSairEditor(evento) {
+  function aoSairDaCelula(evento) {
     var alvo = evento.target;
-    if (!estado.cotacao) return;
-    if (alvo.dataset.itemField === 'quantidadeMillesimos') {
-      var item = estado.cotacao.itens.find(function (entrada) { return String(entrada.id) === String(alvo.dataset.itemId); });
-      if (item && Number.isSafeInteger(item.quantidadeMillesimos)) alvo.value = quantidade(item.quantidadeMillesimos).replace(/\./g, '');
-    }
-    if (alvo.dataset.supplierField === 'freteCentavos') {
-      var fornecedor = estado.cotacao.fornecedores.find(function (entrada) { return String(entrada.id) === String(alvo.dataset.supplierId); });
-      if (fornecedor && Number.isSafeInteger(fornecedor.freteCentavos)) alvo.value = dinheiroParaEdicao(fornecedor.freteCentavos);
-    }
-    if (alvo.dataset.field === 'valorUnitarioCentavos' && alvo.dataset.priceItem) {
-      var preco = obterPreco(alvo.dataset.priceItem, alvo.dataset.priceSupplier);
-      if (Number.isSafeInteger(preco.valorUnitarioCentavos)) alvo.value = dinheiroParaEdicao(preco.valorUnitarioCentavos);
-    }
-    if (alvo.dataset.supplierField === 'cnpj') {
-      var digitos = Financeiro.normalizarCnpj(alvo.value);
-      alvo.setAttribute('aria-invalid', String(Boolean(digitos && !Financeiro.validarCnpj(digitos))));
-    }
-    if (alvo.dataset.supplierField === 'email') {
-      alvo.setAttribute('aria-invalid', String(Boolean(alvo.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alvo.value.trim()))));
+    if (alvo.matches('[data-preco-chave]')) {
+      var centavos = Financeiro.parseMoedaCentavos(alvo.value);
+      if (centavos !== null) alvo.value = Financeiro.formatarMoedaInput(centavos);
+    } else if (alvo.matches('[data-produto-quantidade]')) {
+      var quantidade = Financeiro.parseQuantidadeMillesimos(alvo.value);
+      if (quantidade !== null && quantidade > 0) alvo.value = Financeiro.formatarQuantidade(quantidade, '');
+    } else if (alvo.matches('[data-fornecedor-nome]')) {
+      var fornecedor = fornecedorPorId(alvo.dataset.fornecedorNome);
+      if (!alvo.value.trim() && fornecedor) {
+        alvo.value = fornecedor.nome;
+        mostrarStatus('O fornecedor precisa ter um nome.', 'error', true);
+      } else if (fornecedor) {
+        Modelo.renomearFornecedor(estado, fornecedor.id, alvo.value);
+        alvo.value = fornecedor.nome;
+      }
     }
   }
 
-  function aoTecladoTabela(evento) {
-    if (evento.key !== 'Enter' || evento.shiftKey || !evento.target.matches('[data-field="valorUnitarioCentavos"]')) return;
-    evento.preventDefault();
-    var campos = Array.from(elementos.tabelaWrap.querySelectorAll('[data-field="valorUnitarioCentavos"]:not(:disabled)'));
-    var indice = campos.indexOf(evento.target);
-    if (indice >= 0 && campos[indice + 1]) {
-      campos[indice + 1].focus();
-      campos[indice + 1].select();
-    }
-  }
-
-  function aoCliqueEditor(evento) {
-    var itemBotao = evento.target.closest('[data-item-action]');
-    if (itemBotao) { acaoItem(itemBotao.dataset.itemAction, itemBotao.dataset.id); return; }
-    var fornecedorBotao = evento.target.closest('[data-supplier-action]');
-    if (fornecedorBotao) acaoFornecedor(fornecedorBotao.dataset.supplierAction, fornecedorBotao.dataset.id);
-  }
-
-  async function aoCliqueHistorico(evento) {
-    var botao = evento.target.closest('[data-history-action]');
+  function aoClicarTabela(evento) {
+    var botao = evento.target.closest('button[data-acao]');
     if (!botao) return;
-    var acao = botao.dataset.historyAction;
-    var id = botao.dataset.id;
-    if (acao === 'retry') carregarHistorico(estado.pagina);
-    if (acao === 'open') abrirCotacao(id, false);
-    if (acao === 'print') abrirCotacao(id, true);
-    if (acao === 'delete') excluirPorId(id, false);
-    if (acao === 'cancel') {
-      var motivo = window.prompt('Motivo do cancelamento (opcional):', '');
-      if (motivo === null || !window.confirm('Confirmar o cancelamento desta cotação?')) return;
-      if (!iniciarAcao()) return;
-      try {
-        await chamarApi('/' + encodeURIComponent(id) + '/cancelar', { method: 'POST', body: { motivo: motivo } });
-        await carregarHistorico(estado.pagina);
-      } catch (erroCancelamento) {
-        elementos.listaStatus.textContent = erroCancelamento.message;
-      } finally {
-        encerrarAcao();
+    if (botao.dataset.acao === 'remover-produto') removerProduto(botao.dataset.produtoId);
+    if (botao.dataset.acao === 'duplicar-produto') duplicarProduto(botao.dataset.produtoId);
+    if (botao.dataset.acao === 'remover-fornecedor') removerFornecedor(botao.dataset.fornecedorId);
+  }
+
+  function aoPressionarTeclaTabela(evento) {
+    var alvo = evento.target;
+    if (evento.key !== 'Enter' || !alvo.matches('[data-preco-chave]')) return;
+    evento.preventDefault();
+    var proxima = Modelo.proximaChavePreco(estado, alvo.dataset.produtoId, alvo.dataset.fornecedorId);
+    if (proxima) {
+      var proximoInput = elementos.tabela.querySelector('[data-preco-chave="' + escaparSeletor(proxima) + '"]');
+      if (proximoInput) {
+        proximoInput.focus();
+        proximoInput.select();
       }
-    }
-    if (acao === 'duplicate') {
-      if (!window.confirm('Duplicar esta cotação?')) return;
-      if (!iniciarAcao()) return;
-      try {
-        var dados = await chamarApi('/' + encodeURIComponent(id) + '/duplicar', { method: 'POST', body: {} });
-        estado.requisicaoCotacao += 1;
-        estado.cotacao = normalizarEstadoCotacao(dados.cotacao);
-        estado.sujo = false;
-        renderizarEditor();
-        mostrarVista('editor');
-      } catch (erro) {
-        elementos.listaStatus.textContent = erro.message;
-      } finally {
-        encerrarAcao();
-      }
+    } else {
+      elementos.adicionarProduto.focus();
     }
   }
 
-  function voltarHistorico() {
-    if (estado.sujo && !window.confirm('Há alterações não salvas. Voltar ao histórico mesmo assim? O rascunho continuará salvo neste navegador.')) return;
-    cancelarAgendamentosEdicao();
-    estado.requisicaoCotacao += 1;
-    mostrarVista('historico');
-    carregarHistorico(estado.pagina);
+  function aoEditarMetadados(evento) {
+    var campo = evento.target.dataset.impressaoCampo;
+    if (campo && Object.prototype.hasOwnProperty.call(estado.impressao, campo)) {
+      estado.impressao[campo] = evento.target.value;
+    }
   }
 
-  function vincularEventos() {
-    elementos.nova.addEventListener('click', iniciarNovaCotacao);
-    elementos.voltar.addEventListener('click', voltarHistorico);
-    elementos.filtros.addEventListener('submit', function (evento) { evento.preventDefault(); carregarHistorico(1); });
-    elementos.limparFiltros.addEventListener('click', function () { elementos.filtros.reset(); carregarHistorico(1); });
-    elementos.listaCorpo.addEventListener('click', aoCliqueHistorico);
-    elementos.listaStatus.addEventListener('click', aoCliqueHistorico);
-    elementos.paginacao.addEventListener('click', function (evento) {
-      var botao = evento.target.closest('[data-page]');
-      if (botao && !botao.disabled) carregarHistorico(Number(botao.dataset.page));
-    });
-    elementos.form.addEventListener('input', aoInputEditor);
-    elementos.form.addEventListener('focusout', aoSairEditor);
-    elementos.form.addEventListener('click', aoCliqueEditor);
-    elementos.tabelaWrap.addEventListener('keydown', aoTecladoTabela);
-    elementos.form.addEventListener('submit', function (evento) {
+  function aoPressionarTeclaDocumento(evento) {
+    if (!elementos.previa || elementos.previa.hidden) return;
+    if (evento.key === 'Escape') {
       evento.preventDefault();
-      salvarCotacao({ automatico: false }).catch(function () { /* erro já exibido */ });
-    });
-    elementos.adicionarItem.addEventListener('click', function () {
-      if (!podeEditar() || estado.cotacao.itens.length >= 500) return;
-      estado.cotacao.itens.push(novoItem());
-      garantirMatriz(estado.cotacao);
-      marcarSujo();
-      renderizarTabela();
-      recalcular();
-      atualizarCalculosNaTela();
-    });
-    elementos.adicionarFornecedor.addEventListener('click', function () {
-      if (!podeEditar() || estado.cotacao.fornecedores.length >= 100) return;
-      estado.cotacao.fornecedores.push(novoFornecedor());
-      garantirMatriz(estado.cotacao);
-      marcarSujo();
-      renderizarFornecedores();
-      renderizarTabela();
-      recalcular();
-      atualizarCalculosNaTela();
-    });
-    elementos.finalizar.addEventListener('click', finalizarAtual);
-    elementos.duplicar.addEventListener('click', duplicarAtual);
-    elementos.cancelar.addEventListener('click', cancelarAtual);
-    elementos.excluir.addEventListener('click', function () { if (estado.cotacao && estado.cotacao.id) excluirPorId(estado.cotacao.id, true); });
-    elementos.imprimir.addEventListener('click', prepararPreviewAtual);
-    elementos.printFechar.addEventListener('click', fecharPreviewImpressao);
-    elementos.printExecutar.addEventListener('click', executarImpressao);
-    [elementos.printObservacoes, elementos.printAssinaturas, elementos.printIncompletos, elementos.printFornecedores].forEach(function (el) {
-      el.addEventListener('change', atualizarDocumentoImpressao);
-    });
-    elementos.printPreview.addEventListener('keydown', function (evento) { if (evento.key === 'Escape') fecharPreviewImpressao(); });
+      fecharPrevia();
+      return;
+    }
+    if (evento.key !== 'Tab') return;
+    var focaveis = focaveisPrevia();
+    if (!focaveis.length) return;
+    var primeiro = focaveis[0];
+    var ultimo = focaveis[focaveis.length - 1];
+    if (evento.shiftKey && document.activeElement === primeiro) {
+      evento.preventDefault();
+      ultimo.focus();
+    } else if (!evento.shiftKey && document.activeElement === ultimo) {
+      evento.preventDefault();
+      primeiro.focus();
+    }
+  }
+
+  function registrarEventos() {
+    elementos.adicionarProduto.addEventListener('click', adicionarProduto);
+    elementos.adicionarFornecedor.addEventListener('click', adicionarFornecedor);
+    elementos.limpar.addEventListener('click', limparTabela);
+    elementos.imprimir.addEventListener('click', abrirPrevia);
+    elementos.fecharPrevia.addEventListener('click', fecharPrevia);
+    elementos.executarImpressao.addEventListener('click', imprimir);
+    elementos.tabela.addEventListener('input', aoDigitarTabela);
+    elementos.tabela.addEventListener('change', aoSairDaCelula);
+    elementos.tabela.addEventListener('click', aoClicarTabela);
+    elementos.tabela.addEventListener('keydown', aoPressionarTeclaTabela);
+    elementos.app.addEventListener('input', aoEditarMetadados);
+    document.addEventListener('keydown', aoPressionarTeclaDocumento);
     window.addEventListener('afterprint', function () { document.body.classList.remove('cotacoes-printing'); });
-    window.addEventListener('beforeunload', function (evento) {
-      if (!estado.sujo) return;
-      salvarRascunhoLocal();
-      evento.preventDefault();
-      evento.returnValue = '';
-    });
     window.addEventListener('storage', function (evento) {
       if (evento.key === 'user' && !possuiAcesso()) mostrarAcessoNegado();
     });
   }
 
   function inicializar() {
-    if (estado.inicializado) return true;
-    if (!Financeiro || typeof Financeiro.calcularCotacao !== 'function') return false;
+    if (inicializado) return true;
     elementos = {
-      acessoNegado: porId('cotacoes-acesso-negado'), app: porId('cotacoes-app'), historico: porId('cotacoes-historico'), editor: porId('cotacoes-editor'),
-      nova: porId('cotacoes-nova'), filtros: porId('cotacoes-filtros'), ordenacao: porId('cotacoes-ordenacao'), limparFiltros: porId('cotacoes-limpar-filtros'),
-      listaStatus: porId('cotacoes-lista-status'), listaCorpo: porId('cotacoes-lista-corpo'), paginacao: porId('cotacoes-paginacao'),
-      voltar: porId('cotacoes-voltar'), editorTitulo: porId('cotacoes-editor-titulo'), statusBadge: porId('cotacoes-status-badge'), saveState: porId('cotacoes-save-state'), erros: porId('cotacoes-erros-gerais'),
-      form: porId('cotacoes-form'), fieldset: porId('cotacoes-fieldset'), fornecedores: porId('cotacoes-fornecedores-lista'), adicionarFornecedor: porId('cotacoes-adicionar-fornecedor'),
-      tabelaWrap: porId('cotacoes-tabela-wrap'), sheetStatus: porId('cotacoes-sheet-status'), adicionarItem: porId('cotacoes-adicionar-item'), resumo: porId('cotacoes-resumo-cards'), analise: porId('cotacoes-analise'),
-      salvar: porId('cotacoes-salvar'), finalizar: porId('cotacoes-finalizar'), imprimir: porId('cotacoes-imprimir'), duplicar: porId('cotacoes-duplicar'), cancelar: porId('cotacoes-cancelar'), excluir: porId('cotacoes-excluir'),
-      printPreview: porId('cotacoes-print-preview'), printFechar: porId('cotacoes-print-fechar'), printExecutar: porId('cotacoes-print-executar'), printObservacoes: porId('cotacoes-print-observacoes'), printAssinaturas: porId('cotacoes-print-assinaturas'), printIncompletos: porId('cotacoes-print-incompletos'), printFornecedores: porId('cotacoes-print-fornecedores'), printDocument: porId('cotacoes-print-document')
+      acessoNegado: porId('cotacoes-acesso-negado'),
+      app: porId('cotacoes-app'),
+      adicionarProduto: porId('cotacoes-adicionar-item'),
+      adicionarFornecedor: porId('cotacoes-adicionar-fornecedor'),
+      limpar: porId('cotacoes-limpar'),
+      imprimir: porId('cotacoes-imprimir'),
+      status: porId('cotacoes-sheet-status'),
+      tabela: porId('cotacoes-tabela-wrap'),
+      resumo: porId('cotacoes-resumo'),
+      numero: porId('cotacao-numero'),
+      descricao: porId('cotacao-descricao'),
+      elaboradoPor: porId('cotacao-elaborado-por'),
+      aprovadoPor: porId('cotacao-aprovado-por'),
+      data: porId('cotacao-data'),
+      previa: porId('cotacoes-print-preview'),
+      fecharPrevia: porId('cotacoes-print-fechar'),
+      executarImpressao: porId('cotacoes-print-executar'),
+      documentoImpressao: porId('cotacoes-print-document')
     };
-    if (!elementos.app || !elementos.form) return false;
-    vincularEventos();
-    estado.inicializado = true;
+    if (!Financeiro || !Modelo || !PrintView || !elementos.app || !elementos.tabela) return false;
+    registrarEventos();
+    sincronizarCamposImpressao();
+    renderizarTabela();
+    inicializado = true;
     return true;
   }
 
   function abrir() {
-    if (!inicializar()) return;
-    if (!autorizarOuNegar()) return;
-    mostrarVista('historico');
-    carregarHistorico(1);
+    if (!inicializar()) return false;
+    return autorizarOuNegar();
   }
 
   window.CotacoesApp = Object.freeze({ abrir: abrir });
-  if (document.readyState !== 'loading') inicializar();
-  else document.addEventListener('DOMContentLoaded', inicializar, { once: true });
-}(window, document));
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inicializar);
+  else inicializar();
+})(window, document);

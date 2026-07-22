@@ -332,150 +332,90 @@
         </div>
       </div>
     </section>
-    <!-- TELA 8 - COTACAO DE PRECOS -->
+    <!-- TELA 8 - CALCULADORA TEMPORARIA DE COTACAO -->
     <section id="tela-cotacoes" class="tela" aria-labelledby="cotacoes-titulo">
       <div id="cotacoes-acesso-negado" class="cotacoes-acesso-negado" hidden></div>
+
       <div id="cotacoes-app" class="cotacoes-app" hidden>
-        <div id="cotacoes-historico" class="cotacoes-view">
-          <div class="cotacoes-page-header">
-            <div>
-              <p class="cotacoes-eyebrow">Logística / Compras</p>
-              <h2 id="cotacoes-titulo">Cotação de Preços</h2>
-              <p>Crie, compare e acompanhe propostas comerciais com segurança.</p>
-            </div>
-            <button id="cotacoes-nova" class="cotacoes-btn cotacoes-btn-primary" type="button">+ Nova cotação</button>
+        <header class="cotacoes-page-header">
+          <div class="cotacoes-page-heading">
+            <p class="cotacoes-eyebrow">Logística</p>
+            <h2 id="cotacoes-titulo">Cotação de Preços</h2>
+            <p id="cotacoes-planilha-ajuda">Calculadora temporária. Os dados permanecem somente nesta página e não são salvos.</p>
           </div>
 
-          <form id="cotacoes-filtros" class="cotacoes-filtros" role="search" novalidate>
-            <div class="cotacoes-field cotacoes-field-grow">
-              <label for="cotacoes-busca">Pesquisar</label>
-              <input id="cotacoes-busca" name="busca" type="search" placeholder="Número, descrição ou responsável">
-            </div>
-            <div class="cotacoes-field">
-              <label for="cotacoes-filtro-status">Status</label>
-              <select id="cotacoes-filtro-status" name="status">
-                <option value="">Todos</option>
-                <option value="em_andamento">Em andamento</option>
-                <option value="aguardando_aprovacao">Aguardando aprovação</option>
-                <option value="aprovada">Aprovada</option>
-                <option value="finalizada">Finalizada</option>
-                <option value="cancelada">Cancelada</option>
-              </select>
-            </div>
-            <div class="cotacoes-field">
-              <label for="cotacoes-data-inicio">De</label>
-              <input id="cotacoes-data-inicio" name="dataInicio" type="date">
-            </div>
-            <div class="cotacoes-field">
-              <label for="cotacoes-data-fim">Até</label>
-              <input id="cotacoes-data-fim" name="dataFim" type="date">
-            </div>
-            <div class="cotacoes-field">
-              <label for="cotacoes-ordenacao">Ordenar</label>
-              <select id="cotacoes-ordenacao" name="ordenacao">
-                <option value="atualizada_desc">Última alteração</option>
-                <option value="criada_desc">Mais recentes</option>
-                <option value="numero_asc">Número</option>
-                <option value="status_asc">Status</option>
-              </select>
-            </div>
-            <div class="cotacoes-filter-actions">
-              <button class="cotacoes-btn cotacoes-btn-primary" type="submit">Aplicar</button>
-              <button id="cotacoes-limpar-filtros" class="cotacoes-btn cotacoes-btn-ghost" type="button">Limpar</button>
-            </div>
-          </form>
-
-          <div id="cotacoes-lista-status" class="cotacoes-lista-status" role="status" aria-live="polite"></div>
-          <div class="cotacoes-history-table-wrap">
-            <table class="cotacoes-history-table">
-              <thead><tr><th>Número</th><th>Data</th><th>Responsável</th><th>Status</th><th>Itens / fornecedores</th><th>Custo ideal</th><th>Recomendado</th><th>Última alteração</th><th><span class="sr-only">Ações</span></th></tr></thead>
-              <tbody id="cotacoes-lista-corpo"></tbody>
-            </table>
+          <div class="cotacoes-toolbar" role="group" aria-label="Ações da calculadora de cotação">
+            <button id="cotacoes-adicionar-item" class="cotacoes-btn cotacoes-btn-primary" type="button">+ Adicionar Produto</button>
+            <button id="cotacoes-adicionar-fornecedor" class="cotacoes-btn cotacoes-btn-primary" type="button">+ Adicionar Fornecedor</button>
+            <button id="cotacoes-imprimir" class="cotacoes-btn cotacoes-btn-print" type="button">Imprimir</button>
+            <button id="cotacoes-limpar" class="cotacoes-btn cotacoes-btn-ghost" type="button">Limpar Tabela</button>
           </div>
-          <div id="cotacoes-paginacao" class="cotacoes-paginacao" aria-label="Paginação do histórico"></div>
-        </div>
+        </header>
 
-        <div id="cotacoes-editor" class="cotacoes-view" hidden>
-          <div class="cotacoes-editor-header">
-            <button id="cotacoes-voltar" class="cotacoes-btn cotacoes-btn-ghost" type="button">← Histórico</button>
-            <div class="cotacoes-editor-identidade">
-              <p class="cotacoes-eyebrow">Cotação de Preços</p>
-              <div><h2 id="cotacoes-editor-titulo">Nova cotação</h2><span id="cotacoes-status-badge" class="cotacoes-status-badge">Em andamento</span></div>
-            </div>
-            <div id="cotacoes-save-state" class="cotacoes-save-state" data-state="saved" role="status" aria-live="polite">Salvo</div>
+        <section class="cotacoes-sheet-panel" aria-labelledby="cotacoes-planilha-titulo">
+          <h3 id="cotacoes-planilha-titulo" class="sr-only">Planilha comparativa de produtos e fornecedores</h3>
+          <div id="cotacoes-sheet-status" class="cotacoes-sheet-status" role="status" aria-live="polite" aria-atomic="true">
+            Adicione produtos e fornecedores para iniciar a comparação.
+          </div>
+          <div
+            id="cotacoes-tabela-wrap"
+            class="cotacoes-sheet-wrap"
+            tabindex="0"
+            role="region"
+            aria-label="Planilha de cotação de preços"
+            aria-describedby="cotacoes-planilha-ajuda"
+          >
+            <p class="cotacoes-empty">A planilha está vazia.</p>
+          </div>
+        </section>
+
+        <section id="cotacoes-resumo" class="cotacoes-summary-strip" aria-label="Resumo financeiro da cotação" aria-live="polite" aria-atomic="true">
+          <p class="cotacoes-summary-empty">Preencha a planilha para visualizar o fornecedor recomendado e o potencial de negociação.</p>
+        </section>
+
+        <section class="cotacoes-print-fields" aria-labelledby="cotacoes-dados-impressao-titulo">
+          <div class="cotacoes-section-heading">
+            <h3 id="cotacoes-dados-impressao-titulo">Dados opcionais para impressão</h3>
+            <p>Estas informações também são temporárias e não criam um fluxo de aprovação.</p>
           </div>
 
-          <div id="cotacoes-erros-gerais" class="cotacoes-error-summary" role="alert" tabindex="-1" hidden></div>
-
-          <form id="cotacoes-form" novalidate>
-            <fieldset id="cotacoes-fieldset" class="cotacoes-fieldset">
-              <legend class="sr-only">Dados da cotação</legend>
-              <section class="cotacoes-panel cotacoes-general-panel" aria-labelledby="cotacoes-dados-titulo">
-                <div class="cotacoes-section-title"><div><h3 id="cotacoes-dados-titulo">Dados gerais</h3><p>Identificação, contexto e observações da compra.</p></div></div>
-                <div class="cotacoes-general-grid">
-                  <div class="cotacoes-field"><label for="cotacao-numero">Número</label><input id="cotacao-numero" type="text" readonly placeholder="Gerado ao salvar"></div>
-                  <div class="cotacoes-field"><label for="cotacao-criada-em">Criada em</label><input id="cotacao-criada-em" type="text" readonly value="—"></div>
-                  <div class="cotacoes-field"><label for="cotacao-atualizada-em">Última alteração</label><input id="cotacao-atualizada-em" type="text" readonly value="—"></div>
-                  <div class="cotacoes-field"><label for="cotacao-responsavel">Responsável</label><input id="cotacao-responsavel" type="text" readonly></div>
-                  <div class="cotacoes-field"><label for="cotacao-departamento">Departamento</label><input id="cotacao-departamento" data-cotacao-field="departamento" type="text" maxlength="120" autocomplete="organization-title"></div>
-                  <div class="cotacoes-field"><label for="cotacao-centro-custo">Centro de custo</label><input id="cotacao-centro-custo" data-cotacao-field="centroCusto" type="text" maxlength="120"></div>
-                  <div class="cotacoes-field cotacoes-field-wide"><label for="cotacao-descricao">Descrição da compra <span aria-hidden="true">*</span></label><textarea id="cotacao-descricao" data-cotacao-field="descricaoCompra" rows="3" maxlength="2000" required placeholder="Descreva a necessidade desta compra"></textarea><span class="cotacoes-inline-error" data-error-for="descricaoCompra"></span></div>
-                  <div class="cotacoes-field cotacoes-field-wide"><label for="cotacao-observacoes">Observações internas</label><textarea id="cotacao-observacoes" data-cotacao-field="observacoesInternas" rows="3" maxlength="4000" placeholder="Informações internas que não precisam constar na proposta"></textarea></div>
-                  <div class="cotacoes-field"><label for="cotacao-elaborado-por">Elaborado por</label><input id="cotacao-elaborado-por" data-approval-field="elaboradoPor" type="text" maxlength="200"></div>
-                  <div class="cotacoes-field"><label for="cotacao-conferido-por">Conferido por</label><input id="cotacao-conferido-por" data-approval-field="conferidoPor" type="text" maxlength="200"></div>
-                  <div class="cotacoes-field"><label for="cotacao-aprovado-por">Aprovado por</label><input id="cotacao-aprovado-por" data-approval-field="aprovadoPor" type="text" maxlength="200"></div>
-                  <div class="cotacoes-field"><label for="cotacao-aprovacao-data">Data de aprovação</label><input id="cotacao-aprovacao-data" data-approval-field="data" type="date"></div>
-                </div>
-              </section>
-
-              <section class="cotacoes-panel" aria-labelledby="cotacoes-fornecedores-titulo">
-                <div class="cotacoes-section-title">
-                  <div><h3 id="cotacoes-fornecedores-titulo">Fornecedores</h3><p>Cadastre quantas propostas forem necessárias e escolha quais entram na comparação.</p></div>
-                  <button id="cotacoes-adicionar-fornecedor" class="cotacoes-btn cotacoes-btn-primary" type="button">+ Adicionar fornecedor</button>
-                </div>
-                <div id="cotacoes-fornecedores-lista" class="cotacoes-suppliers"></div>
-              </section>
-
-              <section class="cotacoes-panel cotacoes-sheet-panel" aria-labelledby="cotacoes-itens-titulo">
-                <div class="cotacoes-section-title">
-                  <div><h3 id="cotacoes-itens-titulo">Itens e preços</h3><p>Preencha como em uma planilha. Pressione Enter para avançar ao próximo preço.</p></div>
-                  <button id="cotacoes-adicionar-item" class="cotacoes-btn cotacoes-btn-primary" type="button">+ Adicionar item</button>
-                </div>
-                <div id="cotacoes-sheet-status" class="cotacoes-sheet-status" role="status" aria-live="polite"></div>
-                <div id="cotacoes-tabela-wrap" class="cotacoes-sheet-wrap" tabindex="0" aria-label="Tabela de itens, fornecedores e preços"></div>
-              </section>
-
-              <section class="cotacoes-panel" aria-labelledby="cotacoes-resumo-titulo">
-                <div class="cotacoes-section-title"><div><h3 id="cotacoes-resumo-titulo">Resumo financeiro</h3><p>Resultados recalculados em tempo real.</p></div></div>
-                <div id="cotacoes-resumo-cards" class="cotacoes-summary-grid"></div>
-                <div id="cotacoes-analise" class="cotacoes-analysis" aria-live="polite"></div>
-              </section>
-            </fieldset>
-
-            <div class="cotacoes-editor-actions">
-              <button id="cotacoes-salvar" class="cotacoes-btn cotacoes-btn-primary" type="submit">Salvar cotação</button>
-              <button id="cotacoes-finalizar" class="cotacoes-btn cotacoes-btn-success" type="button">Finalizar</button>
-              <button id="cotacoes-imprimir" class="cotacoes-btn cotacoes-btn-print" type="button">Imprimir cotação</button>
-              <button id="cotacoes-duplicar" class="cotacoes-btn cotacoes-btn-ghost" type="button">Duplicar</button>
-              <button id="cotacoes-cancelar" class="cotacoes-btn cotacoes-btn-warning" type="button">Cancelar cotação</button>
-              <button id="cotacoes-excluir" class="cotacoes-btn cotacoes-btn-danger" type="button">Excluir</button>
+          <div class="cotacoes-print-fields-grid">
+            <div class="cotacoes-field">
+              <label for="cotacao-numero">Número da cotação</label>
+              <input id="cotacao-numero" data-impressao-campo="numero" type="text" maxlength="80" autocomplete="off" placeholder="Ex.: 210726">
             </div>
-          </form>
-        </div>
+            <div class="cotacoes-field">
+              <label for="cotacao-data">Data</label>
+              <input id="cotacao-data" data-impressao-campo="data" type="date">
+            </div>
+            <div class="cotacoes-field">
+              <label for="cotacao-elaborado-por">Elaborado por</label>
+              <input id="cotacao-elaborado-por" data-impressao-campo="elaboradoPor" type="text" maxlength="160" autocomplete="name">
+            </div>
+            <div class="cotacoes-field">
+              <label for="cotacao-aprovado-por">Aprovado por</label>
+              <input id="cotacao-aprovado-por" data-impressao-campo="aprovadoPor" type="text" maxlength="160" autocomplete="off">
+            </div>
+            <div class="cotacoes-field cotacoes-field-wide">
+              <label for="cotacao-descricao">Descrição/resumo da compra</label>
+              <textarea id="cotacao-descricao" data-impressao-campo="descricao" rows="3" maxlength="2000" placeholder="Descreva brevemente a necessidade da compra"></textarea>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <div id="cotacoes-print-preview" class="cotacoes-print-modal" role="dialog" aria-modal="true" aria-labelledby="cotacoes-print-title" hidden>
+      <div id="cotacoes-print-preview" class="cotacoes-print-modal" role="dialog" aria-modal="true" aria-labelledby="cotacoes-print-title" tabindex="-1" hidden>
         <div class="cotacoes-print-toolbar">
-          <div><p class="cotacoes-eyebrow">Documento</p><h2 id="cotacoes-print-title">Pré-visualização da impressão</h2></div>
-          <div class="cotacoes-print-toolbar-actions"><button id="cotacoes-print-executar" class="cotacoes-btn cotacoes-btn-primary" type="button">Imprimir / Salvar PDF</button><button id="cotacoes-print-fechar" class="cotacoes-btn cotacoes-btn-ghost" type="button">Fechar</button></div>
+          <div>
+            <p class="cotacoes-eyebrow">Documento temporário</p>
+            <h2 id="cotacoes-print-title">Pré-visualização da impressão</h2>
+          </div>
+          <div class="cotacoes-print-toolbar-actions">
+            <button id="cotacoes-print-executar" class="cotacoes-btn cotacoes-btn-primary" type="button">Imprimir / Salvar PDF</button>
+            <button id="cotacoes-print-fechar" class="cotacoes-btn cotacoes-btn-ghost" type="button">Fechar</button>
+          </div>
         </div>
-        <div class="cotacoes-print-options">
-          <label><input id="cotacoes-print-observacoes" type="checkbox" checked> Exibir observações</label>
-          <label><input id="cotacoes-print-assinaturas" type="checkbox" checked> Exibir assinaturas</label>
-          <label><input id="cotacoes-print-incompletos" type="checkbox" checked> Exibir fornecedores sem preços completos</label>
-          <fieldset><legend>Fornecedores impressos</legend><div id="cotacoes-print-fornecedores" class="cotacoes-print-supplier-options"></div></fieldset>
-        </div>
-        <div id="cotacoes-print-document" class="cotacoes-print-document"></div>
+        <div id="cotacoes-print-document" class="cotacoes-print-document" aria-live="polite"></div>
       </div>
     </section>
     <!-- TELA 9 - DASHBOARD -->
@@ -493,8 +433,9 @@
   </main>
   <footer class="rodape"><span>Calculadoras Industriais - Razor Industrial | Dados salvos no servidor.</span></footer>
   <script src="js/app.js"></script>
-  <script src="js/funcionario.js"></script>
   <script src="js/cotacoes-financeiro.js"></script>
+  <script src="js/cotacoes-modelo.js"></script>
+  <script src="js/funcionario.js"></script>
   <script src="js/cotacoes-print.js"></script>
   <script src="js/cotacoes.js"></script>
   <script src="js/cancelamentos.js"></script>
