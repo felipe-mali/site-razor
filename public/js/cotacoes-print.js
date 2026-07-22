@@ -88,7 +88,11 @@
 
   function tabela(estado, calculos, bloco) {
     var grupos = bloco.map(function (fornecedor) {
-      return '<th colspan="2" scope="colgroup">' + escapar(fornecedor.nome) + '</th>';
+      var prazo = String(fornecedor.prazoEntrega || '').trim();
+      return '<th colspan="2" scope="colgroup">' + escapar(fornecedor.nome) +
+        '<small class="cot-print-delivery-term">' +
+          escapar(prazo ? 'Prazo de entrega: ' + prazo : 'Prazo de entrega: Não informado') +
+        '</small></th>';
     }).join('');
     var subgrupos = bloco.map(function () {
       return '<th scope="col">Valor unit.</th><th scope="col">Valor total</th>';

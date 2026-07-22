@@ -39,7 +39,7 @@ function aplicarPermissoesSidebar() {
   var cargo = user ? user.cargo : '';
   var grupos = document.querySelectorAll('.sidebar-grupo');
 
-  // Esta regra é apenas de apresentação; a API relê e valida o usuário.
+  // Menu e tela usam a mesma regra central de acesso da calculadora local.
   var menuCotacoes = document.getElementById('menu-cotacoes');
   var podeAcessarCotacoes = podeAcessarModuloCotacoes(user);
   if (menuCotacoes) {

@@ -93,11 +93,35 @@
     return calculos && calculos.fornecedores.find(function (fornecedor) { return fornecedor.fornecedorId === id; });
   }
 
+  function rotuloPreco(produto, fornecedor, menorPreco) {
+    return 'Valor unitário de ' + (produto.descricao || 'produto sem descrição') +
+      ' em ' + (fornecedor.nome || 'Fornecedor') +
+      (menorPreco ? '. Menor preço desta linha' : '');
+  }
+
+  function atualizarRotulosPrecos(produtoId, fornecedorId) {
+    var produtos = produtoId
+      ? estado.produtos.filter(function (produto) { return produto.id === produtoId; })
+      : estado.produtos;
+    var fornecedores = fornecedorId
+      ? estado.fornecedores.filter(function (fornecedor) { return fornecedor.id === fornecedorId; })
+      : estado.fornecedores;
+
+    produtos.forEach(function (produto) {
+      var produtoCalculado = produtoCalculadoPorId(produto.id);
+      fornecedores.forEach(function (fornecedor) {
+        var chave = escaparSeletor(Modelo.chavePreco(produto.id, fornecedor.id));
+        var input = elementos.tabela.querySelector('[data-preco-chave="' + chave + '"]');
+        var preco = produtoCalculado && produtoCalculado.porFornecedor[fornecedor.id];
+        if (input) input.setAttribute('aria-label', rotuloPreco(produto, fornecedor, Boolean(preco && preco.menorPreco)));
+      });
+    });
+  }
+
   function celulaPrecoHtml(produto, fornecedor, calculado) {
     var chave = Modelo.chavePreco(produto.id, fornecedor.id);
     var preco = estado.precos[chave];
     var menor = Boolean(calculado && calculado.menorPreco);
-    var nome = fornecedor.nome || 'Fornecedor';
     return '' +
       '<td class="cotacoes-col-supplier cotacoes-price-cell" data-preco-celula="' + escapar(chave) + '" data-best="' + menor + '">' +
         '<label class="cotacoes-money-input">' +
@@ -105,8 +129,7 @@
           '<input type="text" inputmode="decimal" autocomplete="off" ' +
             'data-preco-chave="' + escapar(chave) + '" data-produto-id="' + escapar(produto.id) + '" ' +
             'data-fornecedor-id="' + escapar(fornecedor.id) + '" value="' + escapar(Financeiro.formatarMoedaInput(preco)) + '" ' +
-            'aria-label="Valor unitário de ' + escapar(produto.descricao || 'produto sem descrição') + ' em ' + escapar(nome) +
-            (menor ? '. Menor preço desta linha' : '') + '">' +
+            'aria-label="' + escapar(rotuloPreco(produto, fornecedor, menor)) + '">' +
         '</label>' +
         '<span class="cotacoes-best-marker"' + (menor ? '' : ' hidden') + '>Menor</span>' +
       '</td>' +
@@ -152,9 +175,15 @@
       '<th class="cotacoes-col-supplier cotacoes-supplier-group" colspan="2" scope="colgroup">' +
         '<div class="cotacoes-supplier-head">' +
           '<label class="sr-only" for="fornecedor-' + escapar(fornecedor.id) + '">Nome do fornecedor</label>' +
-          '<input id="fornecedor-' + escapar(fornecedor.id) + '" type="text" maxlength="160" value="' + escapar(fornecedor.nome) + '" ' +
+          '<input id="fornecedor-' + escapar(fornecedor.id) + '" class="cotacoes-supplier-name" type="text" maxlength="160" value="' + escapar(fornecedor.nome) + '" ' +
             'data-fornecedor-nome="' + escapar(fornecedor.id) + '" aria-label="Nome do fornecedor ' + escapar(fornecedor.nome) + '">' +
           '<button type="button" data-acao="remover-fornecedor" data-fornecedor-id="' + escapar(fornecedor.id) + '" aria-label="Remover fornecedor ' + escapar(fornecedor.nome) + '">Remover</button>' +
+          '<label class="cotacoes-supplier-term" for="prazo-fornecedor-' + escapar(fornecedor.id) + '">' +
+            '<span>Prazo</span>' +
+            '<input id="prazo-fornecedor-' + escapar(fornecedor.id) + '" type="text" maxlength="120" autocomplete="off" ' +
+              'data-fornecedor-prazo="' + escapar(fornecedor.id) + '" value="' + escapar(fornecedor.prazoEntrega || '') + '" ' +
+              'placeholder="Prazo não informado">' +
+          '</label>' +
         '</div>' +
       '</th>';
   }
@@ -244,44 +273,64 @@
       '<div class="cotacoes-summary-item"><span>Percentual de negociação</span><strong>' + Financeiro.formatarPercentualBasisPoints(calculos.percentualNegociacaoBasisPoints) + '</strong></div>';
   }
 
-  function atualizarCalculosNaTabela() {
-    calculos = Modelo.calcular(estado);
-    calculos.produtos.forEach(function (produto) {
-      estado.fornecedores.forEach(function (fornecedor) {
-        var chave = Modelo.chavePreco(produto.produtoId, fornecedor.id);
-        var seletorChave = escaparSeletor(chave);
-        var preco = produto.porFornecedor[fornecedor.id];
-        var celula = elementos.tabela.querySelector('[data-preco-celula="' + seletorChave + '"]');
-        var total = elementos.tabela.querySelector('[data-total-chave="' + seletorChave + '"]');
-        var input = elementos.tabela.querySelector('[data-preco-chave="' + seletorChave + '"]');
-        if (celula) {
-          celula.dataset.best = String(Boolean(preco.menorPreco));
-          var marcador = celula.querySelector('.cotacoes-best-marker');
-          if (marcador) marcador.hidden = !preco.menorPreco;
-        }
-        if (total) total.textContent = Financeiro.formatarMoeda(preco.valorTotalCentavos, '');
-        if (input) {
-          input.setAttribute('aria-label', 'Valor unitário de ' +
-            (estado.produtos.find(function (registro) { return registro.id === produto.produtoId; }).descricao || 'produto sem descrição') +
-            ' em ' + fornecedor.nome + (preco.menorPreco ? '. Menor preço desta linha' : ''));
-        }
-      });
-      var idealUnitario = elementos.tabela.querySelector('[data-ideal-unitario="' + escaparSeletor(produto.produtoId) + '"]');
-      var idealTotal = elementos.tabela.querySelector('[data-ideal-total="' + escaparSeletor(produto.produtoId) + '"]');
-      if (idealUnitario) idealUnitario.textContent = Financeiro.formatarMoeda(produto.menorValorUnitarioCentavos, '');
-      if (idealTotal) idealTotal.textContent = Financeiro.formatarMoeda(produto.custoIdealTotalCentavos, '');
+  function atualizarProdutoNaTabela(produto) {
+    var produtoEstado = estado.produtos.find(function (registro) {
+      return registro.id === produto.produtoId;
     });
-    calculos.fornecedores.forEach(function (fornecedor) {
-      var total = elementos.tabela.querySelector('[data-total-fornecedor="' + escaparSeletor(fornecedor.fornecedorId) + '"]');
-      var completude = elementos.tabela.querySelector('[data-completude-fornecedor="' + escaparSeletor(fornecedor.fornecedorId) + '"]');
-      if (total) total.textContent = Financeiro.formatarMoeda(fornecedor.totalCentavos, 'R$ 0,00');
-      if (completude) {
-        completude.dataset.complete = String(fornecedor.completo);
-        completude.textContent = fornecedor.completo
-          ? 'Cotação completa'
-          : fornecedor.faltantes + (fornecedor.faltantes === 1 ? ' preço pendente' : ' preços pendentes');
+
+    estado.fornecedores.forEach(function (fornecedor) {
+      var chave = Modelo.chavePreco(produto.produtoId, fornecedor.id);
+      var seletorChave = escaparSeletor(chave);
+      var preco = produto.porFornecedor[fornecedor.id];
+      var celula = elementos.tabela.querySelector('[data-preco-celula="' + seletorChave + '"]');
+      var total = elementos.tabela.querySelector('[data-total-chave="' + seletorChave + '"]');
+      var input = elementos.tabela.querySelector('[data-preco-chave="' + seletorChave + '"]');
+      if (celula) {
+        celula.dataset.best = String(Boolean(preco.menorPreco));
+        var marcador = celula.querySelector('.cotacoes-best-marker');
+        if (marcador) marcador.hidden = !preco.menorPreco;
+      }
+      if (total) total.textContent = Financeiro.formatarMoeda(preco.valorTotalCentavos, '');
+      if (input) {
+        input.setAttribute('aria-label', rotuloPreco(produtoEstado || {}, fornecedor, preco.menorPreco));
       }
     });
+
+    var idealUnitario = elementos.tabela.querySelector('[data-ideal-unitario="' + escaparSeletor(produto.produtoId) + '"]');
+    var idealTotal = elementos.tabela.querySelector('[data-ideal-total="' + escaparSeletor(produto.produtoId) + '"]');
+    if (idealUnitario) idealUnitario.textContent = Financeiro.formatarMoeda(produto.menorValorUnitarioCentavos, '');
+    if (idealTotal) idealTotal.textContent = Financeiro.formatarMoeda(produto.custoIdealTotalCentavos, '');
+  }
+
+  function atualizarFornecedorNaTabela(fornecedor) {
+    var seletorId = escaparSeletor(fornecedor.fornecedorId);
+    var total = elementos.tabela.querySelector('[data-total-fornecedor="' + seletorId + '"]');
+    var completude = elementos.tabela.querySelector('[data-completude-fornecedor="' + seletorId + '"]');
+    if (total) total.textContent = Financeiro.formatarMoeda(fornecedor.totalCentavos, 'R$ 0,00');
+    if (completude) {
+      completude.dataset.complete = String(fornecedor.completo);
+      completude.textContent = fornecedor.completo
+        ? 'Cotação completa'
+        : fornecedor.faltantes + (fornecedor.faltantes === 1 ? ' preço pendente' : ' preços pendentes');
+    }
+  }
+
+  function atualizarCalculosNaTabela(alteracao) {
+    calculos = Modelo.calcular(estado);
+    alteracao = alteracao || {};
+
+    var produtosAfetados = alteracao.produtoId
+      ? calculos.produtos.filter(function (produto) { return produto.produtoId === alteracao.produtoId; })
+      : calculos.produtos;
+    produtosAfetados.forEach(atualizarProdutoNaTabela);
+
+    var fornecedoresAfetados = alteracao.fornecedorId
+      ? calculos.fornecedores.filter(function (fornecedor) {
+        return fornecedor.fornecedorId === alteracao.fornecedorId;
+      })
+      : calculos.fornecedores;
+    fornecedoresAfetados.forEach(atualizarFornecedorNaTabela);
+
     var custoIdeal = elementos.tabela.querySelector('[data-custo-ideal-total]');
     if (custoIdeal) custoIdeal.textContent = Financeiro.formatarMoeda(calculos.custoIdealTotalCentavos, '');
     renderizarResumo();
@@ -342,8 +391,7 @@
 
   function limparTabela() {
     if (!autorizarOuNegar()) return;
-    if ((estado.produtos.length || estado.fornecedores.length) &&
-        !window.confirm('Limpar toda a tabela? Produtos, fornecedores e preços serão perdidos.')) return;
+    if (!window.confirm('Limpar toda a tabela? Produtos, fornecedores, preços e dados de impressão serão perdidos.')) return;
     Modelo.limparEstado(estado);
     sincronizarCamposImpressao();
     renderizarTabela();
@@ -391,7 +439,6 @@
     if (!autorizarOuNegar()) return;
     document.body.classList.add('cotacoes-printing');
     window.print();
-    window.setTimeout(function () { document.body.classList.remove('cotacoes-printing'); }, 0);
   }
 
   function focaveisPrevia() {
@@ -401,9 +448,14 @@
   }
 
   function aoDigitarTabela(evento) {
+    if (!possuiAcesso()) {
+      mostrarAcessoNegado();
+      return;
+    }
     var alvo = evento.target;
     if (alvo.matches('[data-produto-descricao]')) {
       Modelo.definirProduto(estado, alvo.dataset.produtoDescricao, { descricao: alvo.value });
+      atualizarRotulosPrecos(alvo.dataset.produtoDescricao, null);
       return;
     }
     if (alvo.matches('[data-produto-quantidade]')) {
@@ -413,7 +465,7 @@
       Modelo.definirProduto(estado, alvo.dataset.produtoQuantidade, {
         quantidadeMillesimos: quantidadeValida ? quantidade : null
       });
-      atualizarCalculosNaTabela();
+      atualizarCalculosNaTabela({ produtoId: alvo.dataset.produtoQuantidade });
       return;
     }
     if (alvo.matches('[data-preco-chave]')) {
@@ -426,16 +478,28 @@
         alvo.dataset.fornecedorId,
         Number.isSafeInteger(centavos) && centavos > 0 ? centavos : null
       );
-      atualizarCalculosNaTabela();
+      atualizarCalculosNaTabela({
+        produtoId: alvo.dataset.produtoId,
+        fornecedorId: alvo.dataset.fornecedorId
+      });
+      return;
+    }
+    if (alvo.matches('[data-fornecedor-prazo]')) {
+      Modelo.definirPrazoEntrega(estado, alvo.dataset.fornecedorPrazo, alvo.value);
       return;
     }
     if (alvo.matches('[data-fornecedor-nome]') && alvo.value.trim()) {
       Modelo.renomearFornecedor(estado, alvo.dataset.fornecedorNome, alvo.value);
+      atualizarRotulosPrecos(null, alvo.dataset.fornecedorNome);
       renderizarResumo();
     }
   }
 
   function aoSairDaCelula(evento) {
+    if (!possuiAcesso()) {
+      mostrarAcessoNegado();
+      return;
+    }
     var alvo = evento.target;
     if (alvo.matches('[data-preco-chave]')) {
       var centavos = Financeiro.parseMoedaCentavos(alvo.value);
@@ -443,6 +507,12 @@
     } else if (alvo.matches('[data-produto-quantidade]')) {
       var quantidade = Financeiro.parseQuantidadeMillesimos(alvo.value);
       if (quantidade !== null && quantidade > 0) alvo.value = Financeiro.formatarQuantidade(quantidade, '');
+    } else if (alvo.matches('[data-fornecedor-prazo]')) {
+      var fornecedorPrazo = fornecedorPorId(alvo.dataset.fornecedorPrazo);
+      if (fornecedorPrazo) {
+        Modelo.definirPrazoEntrega(estado, fornecedorPrazo.id, alvo.value);
+        alvo.value = fornecedorPrazo.prazoEntrega;
+      }
     } else if (alvo.matches('[data-fornecedor-nome]')) {
       var fornecedor = fornecedorPorId(alvo.dataset.fornecedorNome);
       if (!alvo.value.trim() && fornecedor) {
@@ -451,11 +521,17 @@
       } else if (fornecedor) {
         Modelo.renomearFornecedor(estado, fornecedor.id, alvo.value);
         alvo.value = fornecedor.nome;
+        atualizarRotulosPrecos(null, fornecedor.id);
       }
     }
   }
 
   function aoClicarTabela(evento) {
+    if (!possuiAcesso()) {
+      evento.preventDefault();
+      mostrarAcessoNegado();
+      return;
+    }
     var botao = evento.target.closest('button[data-acao]');
     if (!botao) return;
     if (botao.dataset.acao === 'remover-produto') removerProduto(botao.dataset.produtoId);
@@ -464,6 +540,11 @@
   }
 
   function aoPressionarTeclaTabela(evento) {
+    if (!possuiAcesso()) {
+      evento.preventDefault();
+      mostrarAcessoNegado();
+      return;
+    }
     var alvo = evento.target;
     if (evento.key !== 'Enter' || !alvo.matches('[data-preco-chave]')) return;
     evento.preventDefault();
@@ -480,6 +561,10 @@
   }
 
   function aoEditarMetadados(evento) {
+    if (!possuiAcesso()) {
+      mostrarAcessoNegado();
+      return;
+    }
     var campo = evento.target.dataset.impressaoCampo;
     if (campo && Object.prototype.hasOwnProperty.call(estado.impressao, campo)) {
       estado.impressao[campo] = evento.target.value;
@@ -521,9 +606,6 @@
     elementos.app.addEventListener('input', aoEditarMetadados);
     document.addEventListener('keydown', aoPressionarTeclaDocumento);
     window.addEventListener('afterprint', function () { document.body.classList.remove('cotacoes-printing'); });
-    window.addEventListener('storage', function (evento) {
-      if (evento.key === 'user' && !possuiAcesso()) mostrarAcessoNegado();
-    });
   }
 
   function inicializar() {

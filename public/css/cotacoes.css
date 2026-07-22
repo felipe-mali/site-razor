@@ -301,8 +301,12 @@ body.tema-escuro .cotacoes-print-modal {
   text-transform: uppercase;
 }
 
+.cotacoes-sheet-table thead tr:first-child {
+  height: 58px;
+}
+
 .cotacoes-sheet-table thead tr:nth-child(2) th {
-  top: 34px;
+  top: 58px;
   z-index: 21;
   background: var(--cot-header-strong);
   font-size: 9px;
@@ -373,30 +377,31 @@ body.tema-escuro .cotacoes-print-modal {
 }
 
 .cotacoes-supplier-head {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 23px 21px;
+  gap: 2px 4px;
   align-items: center;
-  justify-content: center;
 }
 
 .cotacoes-supplier-head input {
   min-width: 0;
-  height: 25px !important;
-  padding: 3px 5px !important;
   border-color: rgba(255, 255, 255, 0.4) !important;
   background: rgba(255, 255, 255, 0.09) !important;
   color: #ffffff !important;
+}
+
+.cotacoes-supplier-name {
+  width: 100%;
+  height: 23px !important;
+  padding: 3px 5px !important;
   font-weight: 700 !important;
   text-align: center;
   text-transform: uppercase;
 }
 
-.cotacoes-supplier-head input {
-  flex: 1 1 auto;
-}
-
 .cotacoes-supplier-head button {
-  min-height: 25px;
+  min-height: 23px;
   padding: 3px 5px;
   border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 2px;
@@ -405,6 +410,36 @@ body.tema-escuro .cotacoes-print-modal {
   font: 600 8px/1 Arial, sans-serif;
   text-transform: none;
   cursor: pointer;
+}
+
+.cotacoes-supplier-term {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  color: #d8ddd8;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+}
+
+.cotacoes-supplier-term input {
+  width: 100%;
+  height: 21px !important;
+  padding: 2px 5px !important;
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  text-align: left;
+  text-transform: none;
+}
+
+.cotacoes-supplier-term input::placeholder {
+  color: #c1c7c1;
+  opacity: 0.78;
 }
 
 .cotacoes-supplier-head button:hover,
@@ -906,6 +941,18 @@ body.cotacoes-preview-open {
   font-weight: 700;
   text-align: center;
   text-transform: uppercase;
+}
+
+.cot-print-delivery-term {
+  display: block;
+  margin-top: 2px;
+  color: #edf1ed;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  text-transform: none;
 }
 
 .cot-print-table .cot-print-number {

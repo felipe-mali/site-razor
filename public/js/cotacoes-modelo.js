@@ -125,7 +125,11 @@
     if (!nomeLimpo) throw new Error('Informe o nome do fornecedor.');
     var id = textoLimpo(opcoes.id, 160) || gerarId('fornecedor');
     if (!idDisponivel(estado, 'fornecedores', id)) throw new Error('ID de fornecedor duplicado.');
-    var fornecedor = { id: id, nome: nomeLimpo };
+    var fornecedor = {
+      id: id,
+      nome: nomeLimpo,
+      prazoEntrega: textoLimpo(opcoes.prazoEntrega, 120)
+    };
     estado.fornecedores.push(fornecedor);
     estado.produtos.forEach(function (produto) {
       estado.precos[chavePreco(produto.id, fornecedor.id)] = null;
@@ -140,6 +144,14 @@
     var nomeLimpo = textoLimpo(nome, 160);
     if (!nomeLimpo) throw new Error('Informe o nome do fornecedor.');
     fornecedor.nome = nomeLimpo;
+    return fornecedor;
+  }
+
+  function definirPrazoEntrega(estado, fornecedorId, prazo) {
+    exigirEstado(estado);
+    var fornecedor = estado.fornecedores.find(function (registro) { return registro.id === fornecedorId; });
+    if (!fornecedor) throw new Error('Fornecedor não encontrado.');
+    fornecedor.prazoEntrega = textoLimpo(prazo, 120);
     return fornecedor;
   }
 
@@ -209,6 +221,7 @@
     definirProduto: definirProduto,
     adicionarFornecedor: adicionarFornecedor,
     renomearFornecedor: renomearFornecedor,
+    definirPrazoEntrega: definirPrazoEntrega,
     removerFornecedor: removerFornecedor,
     definirPreco: definirPreco,
     proximaChavePreco: proximaChavePreco,

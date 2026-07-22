@@ -100,6 +100,7 @@ teste('módulos expõem somente as operações necessárias à calculadora tempo
     'removerProduto',
     'adicionarFornecedor',
     'renomearFornecedor',
+    'definirPrazoEntrega',
     'removerFornecedor',
     'definirProduto',
     'definirPreco',
@@ -143,6 +144,9 @@ teste('produto e fornecedor criados em qualquer ordem geram todo o produto carte
   adicionarProduto(estado, { id: 'p2', descricao: 'Produto 2', quantidadeMillesimos: 2000 });
   adicionarFornecedor(estado, 'Fornecedor A', { id: 'f1' });
   adicionarFornecedor(estado, 'Fornecedor B', { id: 'f2' });
+
+  assert.equal(estado.fornecedores[0].prazoEntrega, '');
+  assert.equal(estado.fornecedores[1].prazoEntrega, '');
 
   assert.equal(estado.produtos.length, 2);
   assert.equal(estado.fornecedores.length, 2);
@@ -190,19 +194,33 @@ teste('editar, duplicar e remover produto preserva apenas as relações corretas
   assert.equal(preco(estado, 'p2', 'f1'), 900);
 });
 
-teste('renomear e remover fornecedor preserva IDs e elimina somente suas combinações', () => {
+teste('prazo pertence ao fornecedor e sobrevive a edição e renomeação sem alterar cálculos', () => {
   const estado = Modelo.criarEstado();
   adicionarProduto(estado, { id: 'p1', descricao: 'Produto 1', quantidadeMillesimos: 1000 });
   adicionarProduto(estado, { id: 'p2', descricao: 'Produto 2', quantidadeMillesimos: 1000 });
-  adicionarFornecedor(estado, 'Fornecedor A', { id: 'f1' });
+  const fornecedorA = adicionarFornecedor(estado, 'Fornecedor A', {
+    id: 'f1',
+    prazoEntrega: ' 2 dias úteis '
+  });
   adicionarFornecedor(estado, 'Fornecedor B', { id: 'f2' });
   Modelo.definirPreco(estado, 'p1', 'f1', 1000);
   Modelo.definirPreco(estado, 'p1', 'f2', 1100);
 
+  assert.equal(fornecedorA.prazoEntrega, '2 dias úteis');
+  assert.equal(estado.fornecedores[1].prazoEntrega, '');
+  const calculosAntesDoPrazo = Modelo.calcular(estado);
+
+  const prazoEditado = Modelo.definirPrazoEntrega(estado, 'f1', ' 5 dias úteis ');
+  assert.equal(prazoEditado.prazoEntrega, '5 dias úteis');
+  assert.deepEqual(Modelo.calcular(estado), calculosAntesDoPrazo);
+
   const renomeado = Modelo.renomearFornecedor(estado, 'f1', 'Fornecedor Alfa');
   assert.equal(renomeado.id, 'f1');
   assert.equal(renomeado.nome, 'Fornecedor Alfa');
+  assert.equal(renomeado.prazoEntrega, '5 dias úteis');
   assert.equal(preco(estado, 'p1', 'f1'), 1000);
+
+  Modelo.definirPrazoEntrega(estado, 'f2', 'Retirada no local');
 
   assert.equal(Modelo.removerFornecedor(estado, 'f1'), true);
   assert.equal(estado.fornecedores.some(fornecedor => fornecedor.id === 'f1'), false);
@@ -210,6 +228,7 @@ teste('renomear e remover fornecedor preserva IDs e elimina somente suas combina
   assert.equal(possuiPreco(estado, 'p2', 'f1'), false);
   assert.equal(preco(estado, 'p1', 'f2'), 1100);
   assert.equal(possuiPreco(estado, 'p2', 'f2'), true);
+  assert.equal(estado.fornecedores[0].prazoEntrega, 'Retirada no local');
 });
 
 teste('preços inválidos viram vazios, limpar descarta o estado e Enter segue ordem previsível', () => {
@@ -238,6 +257,7 @@ teste('preços inválidos viram vazios, limpar descarta o estado e Enter segue o
 
   estado.impressao.numero = 'TEMP-1';
   estado.impressao.descricao = 'Não deve sobreviver à limpeza.';
+  Modelo.definirPrazoEntrega(estado, 'f1', 'Sob consulta');
   assert.equal(Modelo.limparEstado(estado), estado);
   assert.deepEqual(estado.produtos, []);
   assert.deepEqual(estado.fornecedores, []);
@@ -261,6 +281,15 @@ teste('cenário obrigatório recomenda A e calcula 54000, 51000, 3000 e 556 bps'
   assert.equal(resultado.custoIdealTotalCentavos, 51000);
   assert.equal(resultado.descontoSugeridoCentavos, 3000);
   assert.equal(resultado.percentualNegociacaoBasisPoints, 556);
+
+  entrada.fornecedores.forEach((fornecedor, indice) => {
+    fornecedor.prazoEntrega = `${indice + 3} dias úteis`;
+  });
+  assert.deepEqual(
+    Financeiro.calcularCotacao(entrada),
+    resultado,
+    'Prazo de entrega não pode participar de nenhum cálculo financeiro.'
+  );
 });
 
 teste('totais usam quantidade, menor preço e empate com arredondamento financeiro exato', () => {
@@ -318,6 +347,8 @@ teste('vazio, zero e negativo não completam proposta nem participam do menor pr
   delete entrada.precos[Financeiro.chavePreco('p2', 'completo')];
   const nenhumCompleto = Financeiro.calcularCotacao(entrada);
   assert.deepEqual(nenhumCompleto.fornecedoresRecomendados, []);
+  assert.equal(nenhumCompleto.custoIdealCompleto, false);
+  assert.equal(nenhumCompleto.custoIdealTotalCentavos, null);
   assert.equal(nenhumCompleto.totalRecomendadoCentavos, null);
   assert.equal(nenhumCompleto.descontoSugeridoCentavos, null);
   assert.equal(nenhumCompleto.percentualNegociacaoBasisPoints, null);
@@ -376,8 +407,20 @@ teste('impressão divide sete fornecedores em blocos de até três e repete a pl
   const estado = Modelo.criarEstado();
   adicionarProduto(estado, { id: 'p1', descricao: 'Alicate <universal>', quantidadeMillesimos: 5000 });
   adicionarProduto(estado, { id: 'p2', descricao: 'Trena 5 metros', quantidadeMillesimos: 2000 });
+  const prazos = [
+    '3 dias',
+    '5 dias úteis',
+    '10 dias corridos',
+    'Entrega imediata',
+    'Até 15 dias',
+    'Sob <consulta>',
+    ''
+  ];
   for (let indice = 1; indice <= 7; indice += 1) {
-    adicionarFornecedor(estado, `Fornecedor ${indice}`, { id: `f${indice}` });
+    adicionarFornecedor(estado, `Fornecedor ${indice}`, {
+      id: `f${indice}`,
+      prazoEntrega: prazos[indice - 1]
+    });
     Modelo.definirPreco(estado, 'p1', `f${indice}`, 900 + indice * 100);
     Modelo.definirPreco(estado, 'p2', `f${indice}`, 500 + indice * 100);
   }
@@ -404,6 +447,15 @@ teste('impressão divide sete fornecedores em blocos de até três e repete a pl
     return new Set(nomes.map(nome => nome.toLocaleLowerCase())).size;
   });
   assert.deepEqual(quantidadesFornecedores, [3, 3, 1]);
+  assert.match(folhas[0], /3 dias/);
+  assert.match(folhas[0], /5 dias úteis/);
+  assert.match(folhas[0], /10 dias corridos/);
+  assert.doesNotMatch(folhas[0], /Entrega imediata/);
+  assert.match(folhas[1], /Entrega imediata/);
+  assert.match(folhas[1], /Até 15 dias/);
+  assert.match(folhas[1], /Sob &lt;consulta&gt;/);
+  assert.match(folhas[2], /Prazo de entrega: Não informado/);
+  assert.equal(contar(html, /class="cot-print-delivery-term"/g), 7);
   folhas.forEach(folha => {
     assert.match(folha, /210726/);
     assert.match(folha, /PRODUTO/i);
@@ -418,8 +470,10 @@ teste('impressão divide sete fornecedores em blocos de até três e repete a pl
   assert.match(html, /best-price|data-best="true"/i);
   assert.match(html, /Alicate &lt;universal&gt;/);
   assert.match(html, /Reposição &lt;urgente&gt; do estoque/);
+  assert.match(html, /Prazo de entrega:/i);
+  assert.doesNotMatch(html, /Sob <consulta>/);
   assert.doesNotMatch(html, /<input\b|<button\b|<textarea\b/i);
-  assert.doesNotMatch(html, /RAZÃO SOCIAL|CNPJ|FORMA (?:DE )?PGTO|PRAZO DE ENTREGA|FRETE|TELEFONE|E-?MAIL/i);
+  assert.doesNotMatch(html, /RAZÃO SOCIAL|CNPJ|FORMA (?:DE )?PGTO|FRETE|TELEFONE|E-?MAIL/i);
 });
 
 teste('contrato estático mantém planilha compacta, impressão, temas e quatro ações principais', () => {
@@ -480,6 +534,7 @@ teste('contrato estático mantém planilha compacta, impressão, temas e quatro 
   assert.match(frontend, /data-preco-chave/);
   assert.match(frontend, /data-produto-id/);
   assert.match(frontend, /data-fornecedor-id/);
+  assert.match(frontend, /data-fornecedor-prazo/);
   assert.match(frontend, /(?:evento|event)\.key\s*[!=]===?\s*['"]Enter['"]/);
   assert.doesNotMatch(frontend, /(?:evento|event)\.key\s*===?\s*['"]Tab['"]/);
   assert.match(frontend, /window\.print\s*\(/);
@@ -496,6 +551,8 @@ teste('contrato estático mantém planilha compacta, impressão, temas e quatro 
     assert.match(css, new RegExp(`\\.${classe}\\b`));
   }
   assert.match(css, /\.cotacoes-price-cell\[data-best=(?:"?true"?)\]/);
+  assert.match(css, /\.cotacoes-supplier-term\b/);
+  assert.match(css, /\.cot-print-delivery-term\b/);
   assert.match(css, /(?:prefers-color-scheme\s*:\s*light|data-theme[^\n{]*light|color-scheme\s*:[^;]*light)/i);
   assert.match(css, /(?:prefers-color-scheme\s*:\s*dark|data-theme[^\n{]*dark|--cot-bg\s*:\s*#[0-2])/i);
   assert.match(css, /@page(?:\s+[\w-]+)?\s*\{[^}]*size\s*:\s*A4 landscape[^}]*margin\s*:\s*8mm/is);

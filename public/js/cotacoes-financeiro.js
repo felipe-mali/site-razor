@@ -242,7 +242,7 @@
       produtos: produtosCalculados,
       fornecedores: fornecedoresCalculados,
       custoIdealCompleto: custoIdealCompleto,
-      custoIdealTotalCentavos: produtos.length ? custoIdealTotal : null,
+      custoIdealTotalCentavos: custoIdealCompleto ? custoIdealTotal : null,
       fornecedoresRecomendados: fornecedoresRecomendados,
       totalRecomendadoCentavos: totalRecomendado,
       descontoSugeridoCentavos: desconto,
