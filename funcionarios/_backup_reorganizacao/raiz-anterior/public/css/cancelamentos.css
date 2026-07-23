@@ -1,0 +1,454 @@
+/* ========================================
+   CANCELAMENTOS — Razor Industrial (Modernized)
+   ======================================== */
+
+/* --- Toolbar --- */
+.cancelamentos-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cancelamentos-toolbar .btn-novo-cancelamento {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #F4A41C;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.cancelamentos-toolbar .btn-novo-cancelamento:hover {
+  opacity: 0.9;
+}
+
+/* --- Card --- */
+.cancelamento-card {
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s ease;
+}
+.cancelamento-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.cancelamento-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cancelamento-titulo {
+  font-size: 14px;
+  font-weight: 600;
+  color: #F4A41C;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cancelamento-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cancelamento-meta-item {
+  font-size: 12px;
+  color: #999;
+}
+.cancelamento-meta-item strong {
+  color: #F0F0F0;
+}
+
+.cancelamento-secao {
+  margin-bottom: 10px;
+}
+
+.cancelamento-secao-titulo {
+  font-size: 11px;
+  font-weight: 600;
+  color: #F4A41C;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+
+.cancelamento-secao-conteudo {
+  font-size: 13px;
+  color: #999;
+  line-height: 1.6;
+}
+
+.cancelamento-obs {
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 2px solid rgba(244, 164, 28, 0.3);
+  padding: 10px 14px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #999;
+}
+
+.cancelamento-botoes {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.btn-cancelamento-editar,
+.btn-cancelamento-excluir {
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  background: transparent;
+  color: #999;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-cancelamento-editar:hover {
+  border-color: rgba(244, 164, 28, 0.4);
+  color: #F4A41C;
+}
+.btn-cancelamento-excluir:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+/* --- Modal --- */
+.modal-cancelamento {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-cancelamento.ativo {
+  display: flex;
+  animation: cancelModalFadeIn 0.2s ease forwards;
+}
+
+@keyframes cancelModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-cancelamento-content {
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  animation: cancelModalSlideIn 0.25s ease forwards;
+}
+
+@keyframes cancelModalSlideIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-cancelamento-content h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #F4A41C;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+
+.modal-cancelamento-content .modal-subtitle {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 20px;
+}
+
+.modal-cancelamento-content .form-group {
+  margin-bottom: 14px;
+}
+
+.modal-cancelamento-content label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.modal-cancelamento-content input[type="text"],
+.modal-cancelamento-content textarea {
+  width: 100%;
+  padding: 9px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #F0F0F0;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+}
+.modal-cancelamento-content input[type="text"]:focus,
+.modal-cancelamento-content textarea:focus {
+  outline: none;
+  border-color: #F4A41C;
+}
+
+.modal-cancelamento-content textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+/* Radio group */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.radio-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.radio-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.radio-item input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+}
+.radio-item input[type="radio"]:hover {
+  border-color: rgba(244, 164, 28, 0.5);
+}
+.radio-item input[type="radio"]:checked {
+  border-color: #F4A41C;
+  background: #F4A41C;
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.2);
+}
+.radio-item input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  background: #1a1a2e;
+  border-radius: 50%;
+}
+
+.radio-item input[type="radio"]:focus-visible {
+  outline: 2px solid #F4A41C;
+  outline-offset: 3px;
+}
+
+.radio-item label {
+  margin: 0;
+  font-size: 13px;
+  color: #F0F0F0;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+/* Campo condicional */
+.campo-condicional {
+  margin-left: 24px;
+  margin-top: 4px;
+  display: none;
+}
+.campo-condicional.ativo {
+  display: block;
+}
+.campo-condicional input {
+  width: 100%;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  color: #F0F0F0;
+  font-size: 12px;
+}
+.campo-condicional input:focus {
+  outline: none;
+  border-color: #F4A41C;
+}
+
+/* Botões do modal */
+.modal-cancelamento-botoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.btn-modal-salvar {
+  padding: 8px 20px;
+  background: #F4A41C;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.btn-modal-salvar:hover {
+  opacity: 0.9;
+}
+.btn-modal-salvar:focus-visible {
+  outline: 2px solid #F4A41C;
+  outline-offset: 2px;
+}
+
+.btn-modal-cancelar {
+  padding: 8px 20px;
+  background: transparent;
+  color: #999;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-modal-cancelar:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #F0F0F0;
+}
+.btn-modal-cancelar:focus-visible {
+  outline: 2px solid #F4A41C;
+  outline-offset: 2px;
+}
+
+/* --- Modal de senha --- */
+.modal-senha {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-senha.ativo {
+  display: flex;
+}
+
+.modal-senha-content {
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 360px;
+  padding: 28px;
+  text-align: center;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+.modal-senha-content h3 {
+  font-size: 14px;
+  color: #F4A41C;
+  margin-bottom: 6px;
+}
+
+.modal-senha-content p {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 16px;
+}
+
+.modal-senha-content input {
+  width: 100%;
+  padding: 9px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #F0F0F0;
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.modal-senha-content input:focus {
+  outline: none;
+  border-color: #F4A41C;
+  box-shadow: 0 0 0 3px rgba(244, 164, 28, 0.1);
+}
+
+.modal-senha-botoes {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.modal-senha-botoes button:focus-visible {
+  outline: 2px solid #F4A41C;
+  outline-offset: 2px;
+}
+
+.modal-senha-erro {
+  color: #ef4444;
+  font-size: 12px;
+  margin-bottom: 10px;
+  display: none;
+}
+
+/* --- Empty / Blocked states --- */
+.cancelamentos-vazio,
+.cancelamentos-bloqueado {
+  text-align: center;
+  padding: 48px 20px;
+  color: #666;
+}
+.cancelamentos-vazio .icone,
+.cancelamentos-bloqueado .icone {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.2;
+}
+.cancelamentos-vazio p,
+.cancelamentos-bloqueado p {
+  font-size: 13px;
+}

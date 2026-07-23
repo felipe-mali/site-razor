@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0A0A0A">
+  <title>Painel do Colaborador - Razor Industria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/funcionario.css">
+  <link rel="stylesheet" href="css/cancelamentos.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/cotacoes.css">
+  <link rel="stylesheet" href="css/admin-polish.css">
+</head>
+<body class="panel-page sidebar-page">
+  <header id="navbar">
+    <div class="container">
+      <a href="funcionario.html" class="nav-logo"><img src="fotos/logo.jpg" alt="Razor Industria" class="logo"></a>
+      <nav>
+        <a href="funcionario.html">Inicio</a>
+        <a href="funcionario.html" class="active">Painel</a>
+        <a href="permissoes.html" id="link-permissoes" style="display:none">Permissoes</a>
+        <a href="chaves-pagamento.html" id="link-chaves" style="display:none">Chaves</a>
+        <a href="#" id="btn-sair" class="btn btn-ghost btn-sm">Sair</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+    <div class="nav-overlay"></div>
+  </header>
+  <div class="panel-header"><div class="container"><h1>Bem-vindo, <span id="user-name"></span></h1></div></div>
+
+  <!-- SIDEBAR COLAPSIVEL -->
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="sidebar-content">
+      <div class="sidebar-grupo" data-group="calculadoras">
+        <div class="sidebar-grupo-titulo" onclick="toggleGrupo(this)">
+          <span>Calculadoras</span>
+          <span class="sidebar-seta">&#9660;</span>
+        </div>
+        <div class="sidebar-itens">
+          <button class="sidebar-btn" id="menu-producao" onclick="trocarTela('producao')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="sidebar-label">Prazo de Producao</span>
+          </button>
+          <button class="sidebar-btn" id="menu-conversor" onclick="trocarTela('conversor')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+            <span class="sidebar-label">Conversor</span>
+          </button>
+          <button class="sidebar-btn" id="menu-mureta" onclick="trocarTela('mureta')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span class="sidebar-label">Mureta</span>
+          </button>
+          <button class="sidebar-btn" id="menu-malha" onclick="trocarTela('malha')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <span class="sidebar-label">Malha/Bobina</span>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-grupo" data-group="comercial">
+        <div class="sidebar-grupo-titulo" onclick="toggleGrupo(this)">
+          <span>Vendedores / Comercial</span>
+          <span class="sidebar-seta">&#9660;</span>
+        </div>
+        <div class="sidebar-itens">
+          <button class="sidebar-btn" id="menu-crm" onclick="trocarTela('crm')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            <span class="sidebar-label">CRM</span>
+          </button>
+          <button class="sidebar-btn" id="menu-cancelamentos" onclick="trocarTela('cancelamentos')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            <span class="sidebar-label">Cancelamentos</span>
+          </button>
+          <button class="sidebar-btn" id="menu-fotos" onclick="trocarTela('fotos')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span class="sidebar-label">Fotos</span>
+          </button>
+          <button class="sidebar-btn" id="menu-dashboard" onclick="trocarTela('dashboard')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <span class="sidebar-label">Dashboard</span>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-grupo" data-group="producao">
+        <div class="sidebar-grupo-titulo" onclick="toggleGrupo(this)">
+          <span>Producao</span>
+          <span class="sidebar-seta">&#9660;</span>
+        </div>
+        <div class="sidebar-itens">
+          <button class="sidebar-btn" id="menu-producao-tab" onclick="trocarTela('producao')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="sidebar-label">Prazo de Producao</span>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-grupo" data-group="logistica">
+        <div class="sidebar-grupo-titulo" onclick="toggleGrupo(this)">
+          <span>Logistica</span>
+          <span class="sidebar-seta">&#9660;</span>
+        </div>
+        <div class="sidebar-itens">
+          <button class="sidebar-btn" id="menu-fotos-log" onclick="trocarTela('fotos')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span class="sidebar-label">Fotos</span>
+          </button>
+          <button class="sidebar-btn" id="menu-cotacoes" type="button" onclick="trocarTela('cotacoes')" hidden>
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18H4z"/><path d="M8 7h8M8 11h3M14 11h2M8 15h3M14 15h2"/></svg>
+            <span class="sidebar-label">Cotação de Preços</span>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-grupo" data-group="admin">
+        <div class="sidebar-grupo-titulo" onclick="toggleGrupo(this)">
+          <span>Admin</span>
+          <span class="sidebar-seta">&#9660;</span>
+        </div>
+        <div class="sidebar-itens">
+          <a href="chaves-pagamento.html" class="sidebar-btn">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            <span class="sidebar-label">Chaves Pagamento</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- AREA PRINCIPAL -->
+  <main class="main-content sidebar-main">    <!-- TELA 1 - PRODUCAO -->
+    <section id="tela-producao" class="tela ativa">
+      <div class="tela-titulo"><h2>Calculadora - Prazo de Producao</h2><p class="subtitulo">Estime horas, dias de fabricacao e previsao de entrega.</p></div>
+      <div class="card-grid">
+        <div class="card">
+          <h3 class="card-titulo">Dados de Entrada</h3>
+          <div class="campo-grupo"><label for="prod-malha">Malha</label><select id="prod-malha" onchange="calcularProducao()"><option value="2.5">2,5</option><option value="5">5</option><option value="8">8</option><option value="10">10</option></select></div>
+          <div class="campo-grupo"><label for="prod-comprimento">Comprimento (metros)</label><input type="text" id="prod-comprimento" class="obrigatorio" placeholder="Ex: 2,5" oninput="calcularProducao()" /></div>
+          <div class="campo-grupo"><label for="prod-altura">Altura (metros)</label><input type="text" id="prod-altura" class="obrigatorio" placeholder="Ex: 1,7" oninput="calcularProducao()" /></div>
+          <div class="campo-grupo"><label for="prod-quantidade">Quantidade</label><input type="text" id="prod-quantidade" class="obrigatorio" placeholder="Ex: 10" oninput="calcularProducao()" /></div>
+          <div class="campo-grupo"><label for="prod-dias-fila">Dias em fila de producao</label><input type="text" id="prod-dias-fila" placeholder="Ex: 3" oninput="calcularProducao()" /></div>
+          <div class="botoes-acao"><button class="btn-limpar" onclick="limparProducao()">&#128465; Novo</button><button class="btn-imprimir" onclick="imprimirOrcamento('producao')">&#128424; Imprimir</button></div>
+        </div>
+        <div class="card">
+          <h3 class="card-titulo">Resultados</h3>
+          <div id="erro-producao" class="msg-erro hidden"></div>
+          <div class="resultado-grid">
+            <div class="resultado-item"><span class="resultado-label">Metro Linear Total</span><span class="resultado-valor" id="res-metro-linear">&mdash;</span><span class="resultado-unidade">m</span></div>
+            <div class="resultado-item"><span class="resultado-label">M&sup2; Total</span><span class="resultado-valor" id="res-m2-total">&mdash;</span><span class="resultado-unidade">m&sup2;</span></div>
+            <div class="resultado-item destaque"><span class="resultado-label">Horas de Fabricacao</span><span class="resultado-valor" id="res-horas-fab">&mdash;</span><span class="resultado-unidade">h</span></div>
+            <div class="resultado-item destaque"><span class="resultado-label">Dias de Fabricacao</span><span class="resultado-valor" id="res-dias-fab">&mdash;</span><span class="resultado-unidade">dias</span></div>
+            <div class="resultado-item principal"><span class="resultado-label">Previsao de Entrega</span><span class="resultado-valor" id="res-previsao">&mdash;</span><span class="resultado-unidade">dias uteis</span></div>
+          </div>
+          <div class="aviso-box"><strong>&#9888; Atencao</strong><p>* Estes prazos devem ser acrescidos aos demais pedidos ja em fila de producao.</p><p>** Esta calculadora funciona apenas com medidas em metros.</p></div>
+        </div>
+        <div class="card card-full">
+          <div class="admin-cabecalho">
+            <div><h3 class="card-titulo" style="margin-bottom:4px;">&#9881; Configuracoes de Produtividade</h3><p class="card-desc" style="margin-bottom:0">Produtividade cadastrada por malha em m&sup2;/hora. <strong>Horas = M&sup2; Total / Producao (m&sup2;/h).</strong></p></div>
+            <div class="admin-botoes"><button class="btn-desbloquear" id="btn-desbloquear" onclick="desbloquearConfiguracoes()">&#128274; Desbloquear Configuracoes</button><button class="btn-bloquear hidden" id="btn-bloquear" onclick="bloquearConfiguracoes()">&#128275; Bloquear</button></div>
+          </div>
+          <div id="area-admin" class="hidden">
+            <div class="tabela-fatores-wrap" style="margin-top:16px;">
+              <table class="tabela-fatores"><thead><tr><th>Malha</th><th>Producao (m&sup2;/hora)</th><th></th></tr></thead><tbody id="corpo-tabela-producao"></tbody></table>
+              <div class="admin-actions">
+                <button class="btn-add-fator" onclick="adicionarMalhaProducao()">+ Adicionar malha</button>
+                <button class="btn-salvar" id="btn-salvar-producao" onclick="salvarTabelaProducao()" disabled>&#128190; Salvar</button>
+                <span id="feedback-salvar-producao" class="feedback-msg hidden"></span>
+                <div class="admin-export"><button class="btn-export" onclick="exportarProducaoJSON()">&#128228; JSON</button><button class="btn-export" onclick="exportarProducaoCSV()">&#128228; CSV</button><button class="btn-export" onclick="exportarProducaoTXT()">&#128228; TXT</button><button class="btn-export" onclick="importarProducaoJSON()">&#128229; Importar</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- TELA 2 - CONVERSOR -->
+    <section id="tela-conversor" class="tela">
+      <div class="tela-titulo"><h2>Conversor de Medidas</h2><p class="subtitulo">Converta entre unidades de comprimento em tempo real.</p></div>
+      <div class="card">
+        <div class="conv-selector"><label for="conv-unidade">Unidade de origem</label><select id="conv-unidade" onchange="converterMedidas()"><option value="mm">Milimetro (mm)</option><option value="cm">Centimetro (cm)</option><option value="m" selected>Metro (m)</option><option value="km">Quilometro (km)</option></select></div>
+        <div class="campo-grupo"><label for="conv-valor">Valor</label><input type="text" id="conv-valor" placeholder="Ex: 1,5" oninput="converterMedidas()" /></div>
+        <div class="conv-resultados">
+          <div class="conv-resultado-item"><span class="conv-res-unidade">Milimetro</span><span class="conv-res-valor" id="res-mm">&mdash;</span><span class="conv-res-sigla">mm</span></div>
+          <div class="conv-resultado-item"><span class="conv-res-unidade">Centimetro</span><span class="conv-res-valor" id="res-cm">&mdash;</span><span class="conv-res-sigla">cm</span></div>
+          <div class="conv-resultado-item"><span class="conv-res-unidade">Metro</span><span class="conv-res-valor" id="res-m">&mdash;</span><span class="conv-res-sigla">m</span></div>
+          <div class="conv-resultado-item"><span class="conv-res-unidade">Quilometro</span><span class="conv-res-valor" id="res-km">&mdash;</span><span class="conv-res-sigla">km</span></div>
+        </div>
+      </div>
+    </section>    <!-- TELA 3 - MURETA -->
+    <section id="tela-mureta" class="tela">
+      <div class="tela-titulo"><h2>Calculadora - Materiais para Mureta</h2><p class="subtitulo">Calcule os materiais necessarios para construcao de mureta.</p></div>
+      <div class="card-grid">
+        <div class="card">
+          <h3 class="card-titulo">Dados de Entrada</h3>
+          <div class="campo-grupo"><label for="mur-metros">Metros Lineares</label><input type="text" id="mur-metros" class="obrigatorio" placeholder="Ex: 100" oninput="calcularMureta()" /></div>
+          <div class="campo-grupo"><label for="mur-fiada-bloco">Fiada Bloco de Cimento 15</label><input type="number" id="mur-fiada-bloco" placeholder="Ex: 1" oninput="calcularMureta()" value="1" min="0" step="1" /></div>
+          <div class="campo-grupo"><label for="mur-fiada-canaleta">Fiada Canaleta Cimento 15</label><input type="number" id="mur-fiada-canaleta" placeholder="Ex: 1" oninput="calcularMureta()" value="1" min="0" step="1" /></div>
+          <div class="campo-grupo"><label for="mur-altura">Altura da Mureta (cm) <small>(informativo)</small></label><input type="number" id="mur-altura" placeholder="Ex: 40" oninput="calcularMureta()" min="0" step="1" /></div>
+          <div class="botoes-acao"><button class="btn-limpar" onclick="limparMureta()">&#128465; Novo</button><button class="btn-imprimir" onclick="window.print()">&#128424; Imprimir</button></div>
+        </div>
+        <div class="card">
+          <h3 class="card-titulo">Materiais Necessarios</h3>
+          <div id="erro-mureta" class="msg-erro hidden"></div>
+          <div class="tabela-materiais-wrap">
+            <table class="tabela-materiais"><thead><tr><th>Material</th><th>Quantidade</th><th>Unidade</th></tr></thead><tbody>
+              <tr><td>Bloco</td><td id="res-bloco">&mdash;</td><td class="unidade-col">UNIDADES</td></tr>
+              <tr><td>Meio Bloco de Concreto</td><td id="res-meio-bloco">&mdash;</td><td class="unidade-col">UNIDADES</td></tr>
+              <tr><td>Canaleta Estrutural de Concreto</td><td id="res-canaleta">&mdash;</td><td class="unidade-col">UNIDADES</td></tr>
+              <tr><td>Meia Canaleta Estrutural</td><td id="res-meia-canaleta">&mdash;</td><td class="unidade-col">UNIDADES</td></tr>
+              <tr class="linha-sep"><td>Saco de Cimento 50kg</td><td id="res-cimento">&mdash;</td><td class="unidade-col">SACOS</td></tr>
+              <tr><td>Metro de Areia</td><td id="res-areia">&mdash;</td><td class="unidade-col">m&sup3;</td></tr>
+              <tr><td>Metro de Pedrisco</td><td id="res-pedrisco">&mdash;</td><td class="unidade-col">m&sup3;</td></tr>
+            </tbody></table>
+          </div>
+          <div class="coeficientes-box"><h4>Coeficientes utilizados</h4><div class="coef-grid"><span>Bloco: 2,5 x fiadas</span><span>Canaleta: 2,5 x fiadas</span><span>Cimento: 0,13/m</span><span>Areia: 0,03/m</span><span>Pedrisco: 0,015/m</span></div></div>
+        </div>
+      </div>
+    </section>
+    <!-- TELA 4 - MALHA/BOBINA -->
+    <section id="tela-malha" class="tela">
+      <div class="tela-titulo"><h2>Calculadora - Peso da Malha / Bobina</h2><p class="subtitulo">Calcule o peso total de bobinas de malha de arame.</p></div>
+      <div class="card-grid">
+        <div class="card">
+          <h3 class="card-titulo">Dados de Entrada</h3>
+          <div class="campo-grupo"><label for="malha-tipo">Malha</label><select id="malha-tipo" onchange="calcularMalha()"><option value="">-- Selecione --</option><option value="malha2_5">Malha 2,5</option><option value="malha5">Malha 5</option><option value="malha8">Malha 8</option><option value="malha10">Malha 10</option></select></div>
+          <div class="campo-grupo"><label for="malha-bwg">Arame (BWG)</label><select id="malha-bwg" onchange="calcularMalha()"><option value="">-- Selecione --</option></select></div>
+          <div class="campo-grupo"><label for="malha-metros">Metros Lineares</label><input type="text" id="malha-metros" class="obrigatorio" placeholder="Ex: 50" oninput="calcularMalha()" /></div>
+          <div class="campo-grupo"><label for="malha-altura">Altura (metros)</label><input type="text" id="malha-altura" placeholder="Ex: 1,2" oninput="calcularMalha()" /></div>
+          <div class="campo-grupo"><label for="malha-bobinas">Quantidade de Bobinas</label><input type="text" id="malha-bobinas" placeholder="Ex: 5" oninput="calcularMalha()" /></div>
+          <div class="botoes-acao"><button class="btn-limpar" onclick="limparMalha()">&#128465; Novo</button><button class="btn-imprimir" onclick="window.print()">&#128424; Imprimir</button></div>
+        </div>
+        <div class="card">
+          <h3 class="card-titulo">Resultados</h3>
+          <div id="erro-malha" class="msg-erro hidden"></div>
+          <div class="resultado-grid">
+            <div class="resultado-item destaque"><span class="resultado-label">Peso por Bobina</span><span class="resultado-valor" id="res-peso-bobina">&mdash;</span><span class="resultado-unidade">KG</span></div>
+            <div class="resultado-item principal"><span class="resultado-label">Peso Total</span><span class="resultado-valor" id="res-peso-total">&mdash;</span><span class="resultado-unidade">KG</span></div>
+          </div>
+          <div class="card-sub">
+            <div class="admin-cabecalho">
+              <div><h4 class="card-sub-titulo">Tabela de Pesos (kg/m) <span class="badge-edit" id="badge-pesos">Bloqueado</span></h4><p class="card-desc" style="margin-bottom:0">Pesos por metro para cada combinacao malha/BWG. <strong>Peso = pesoPorMetro x metros x altura.</strong></p></div>
+              <div class="admin-botoes"><button class="btn-desbloquear" id="btn-desbloquear-pesos" onclick="desbloquearPesos()">&#128274; Desbloquear</button><button class="btn-bloquear hidden" id="btn-bloquear-pesos" onclick="bloquearPesos()">&#128275; Bloquear</button></div>
+            </div>
+            <div id="area-admin-pesos" class="hidden">
+              <div class="tabela-pesos-wrap" style="margin-top:16px;">
+                <table class="tabela-pesos" id="tabela-pesos"><thead><tr><th>Malha</th><th>BWG</th><th>Peso (kg/m)</th><th></th></tr></thead><tbody id="corpo-tabela-pesos"></tbody></table>
+                <div class="admin-actions">
+                  <button class="btn-salvar" id="btn-salvar-pesos" onclick="salvarTabelaPesos()" disabled>&#128190; Salvar</button>
+                  <span id="feedback-salvar" class="feedback-msg hidden"></span>
+                  <div class="admin-export"><button class="btn-export" onclick="exportarPesosJSON()">&#128228; Exportar JSON</button><button class="btn-export" onclick="importarPesosJSON()">&#128229; Importar JSON</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>    <!-- TELA 5 - FOTOS -->
+    <section id="tela-fotos" class="tela">
+      <div class="tela-titulo"><h2>Fotos dos Clientes</h2><p class="subtitulo">Organize e gerencie as imagens dos seus clientes.</p></div>
+      <div class="fotos-toolbar" id="fotos-toolbar">
+        <button class="btn-foto btn-foto-adicionar" id="btn-adicionar-foto" onclick="fotosAdicionarFotoUI()">&#128247; Adicionar Foto</button>
+        <button class="btn-foto btn-pasta-criar" id="btn-criar-pasta" onclick="fotosCriarPastaUI()">&#128193; Adicionar Pasta</button>
+      </div>
+      <div id="fotos-conteudo"></div>
+    </section>
+    <!-- TELA 6 - CRM -->
+    <section id="tela-crm" class="tela">
+      <div class="tela-titulo"><h2>CRM - Clientes</h2><p class="subtitulo">Cadastre e gerencie seus clientes.</p></div>
+      <div class="crm-toolbar">
+        <button class="btn-crm-novo" onclick="crmNovoUI()">+ Criar Cliente</button>
+        <div class="crm-filtros">
+          <select id="crm-filtro-vendedor" onchange="crmFiltrarVendedor(this.value)"><option value="">Todos os vendedores</option></select>
+          <input type="text" id="crm-busca" placeholder="Buscar por nome ou empresa..." oninput="crmBuscar(this.value)" />
+        </div>
+        <div class="admin-export"><button class="btn-export" onclick="crmExportarJSON()">&#128228; Exportar</button><button class="btn-export" onclick="crmImportarJSON()">&#128229; Importar</button></div>
+      </div>
+      <div class="crm-tabela-wrap"><div id="crm-tabela-conteudo"></div></div>
+    </section>
+    <!-- TELA 7 - CANCELAMENTOS -->
+    <section id="tela-cancelamentos" class="tela">
+      <div class="tela-titulo"><h2>Cancelamentos de Orcamento</h2><p class="subtitulo">Registre e gerencie solicitacoes de cancelamento.</p></div>
+      <div class="cancelamentos-toolbar" id="cancelamentos-toolbar">
+        <button class="btn-novo-cancelamento" onclick="cancelamentoNovoUI()">+ Nova Solicitacao</button>
+      </div>
+      <div id="cancelamentos-conteudo"></div>
+      <!-- Modal Nova/Editar Cancelamento -->
+      <div id="modal-cancelamento" class="modal-cancelamento">
+        <div class="modal-cancelamento-content">
+          <h2 id="cancel-modal-titulo">NOVA SOLICITACAO</h2>
+          <p class="modal-subtitle">SOLICITACAO DE CANCELAMENTO DE ORCAMENTO</p>
+          <div class="form-group"><label>SOLICITANTE</label><input type="text" id="cancel-solicitante" readonly /></div>
+          <div class="form-group"><label>NUMERO DO ORCAMENTO (Obrigatorio)</label><input type="text" id="cancel-numero-orcamento" placeholder="Ex: 16114" /></div>
+          <div class="form-group"><label>DATA</label><input type="datetime-local" id="cancel-data" /></div>
+          <div class="form-group">
+            <label>QUAL CANAL DE CONTATO ONDE FOI INFORMADO O CANCELAMENTO</label>
+            <div class="radio-group">
+              <div class="radio-item"><input type="radio" name="cancel-canal" id="canal-whatsapp" value="Whatsapp" /><label for="canal-whatsapp">Whatsapp</label></div>
+              <div class="radio-item"><input type="radio" name="cancel-canal" id="canal-telefone" value="Telefone PABX" /><label for="canal-telefone">Telefone PABX</label></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>MATRIZ DE ACAO POR MOTIVO</label>
+            <div class="radio-group">
+              <div class="radio-item"><input type="radio" name="cancel-motivo" id="motivo-1" value="1" onchange="cancelamentoMotivoToggle(this.value)" /><label for="motivo-1">1. Preco (nao aprovou o valor)</label></div>
+              <div class="radio-item"><input type="radio" name="cancel-motivo" id="motivo-2" value="2" onchange="cancelamentoMotivoToggle(this.value)" /><label for="motivo-2">2. Concorrente - foi para outro fornecedor</label></div>
+              <div class="radio-item"><input type="radio" name="cancel-motivo" id="motivo-3" value="3" onchange="cancelamentoMotivoToggle(this.value)" /><label for="motivo-3">3. Desistiu da compra</label></div>
+              <div class="radio-item"><input type="radio" name="cancel-motivo" id="motivo-4" value="4" onchange="cancelamentoMotivoToggle(this.value)" /><label for="motivo-4">4. Sem resposta - nao retornou contato</label></div>
+              <div class="radio-item"><input type="radio" name="cancel-motivo" id="motivo-5" value="5" onchange="cancelamentoMotivoToggle(this.value)" /><label for="motivo-5">5. Perdeu para prazo / disponibilidade</label></div>
+              <div class="radio-item"><input type="radio" name="cancel-motivo" id="motivo-6" value="6" onchange="cancelamentoMotivoToggle(this.value)" /><label for="motivo-6">6. Erro de formatacao ou orcamento duplicado</label></div>
+            </div>
+            <div id="campo-substituto" class="campo-condicional"><label>Qual orcamento substituiu (Obrigatorio)</label><input type="text" id="cancel-motivo-substituto" placeholder="Ex: 16114" /></div>
+          </div>
+          <div class="form-group"><label>OBSERVACOES</label><textarea id="cancel-observacoes" placeholder="Detalhes adicionais sobre o cancelamento..."></textarea></div>
+          <div class="modal-cancelamento-botoes">
+            <button class="btn-modal-cancelar" onclick="cancelamentoFecharModal()">Cancelar</button>
+            <button class="btn-modal-salvar" onclick="cancelamentoSalvar()">Salvar</button>
+          </div>
+        </div>
+      </div>
+      <!-- Modal Senha -->
+      <div id="modal-senha-cancelamento" class="modal-senha">
+        <div class="modal-senha-content">
+          <h3>Autenticacao Necessaria</h3>
+          <p>Digite a senha para editar ou excluir</p>
+          <div id="senha-cancel-erro" class="modal-senha-erro"></div>
+          <input type="password" id="senha-cancel-input" placeholder="Senha" onkeydown="if(event.key==='Enter')senhaModalConfirmar()" />
+          <div class="modal-senha-botoes">
+            <button class="btn-modal-cancelar" onclick="senhaModalFechar()">Cancelar</button>
+            <button class="btn-modal-salvar" onclick="senhaModalConfirmar()">Confirmar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- TELA 8 - CALCULADORA TEMPORARIA DE COTACAO -->
+    <section id="tela-cotacoes" class="tela" aria-labelledby="cotacoes-titulo">
+      <div id="cotacoes-acesso-negado" class="cotacoes-acesso-negado" hidden></div>
+
+      <div id="cotacoes-app" class="cotacoes-app" hidden>
+        <header class="cotacoes-page-header">
+          <div class="cotacoes-page-heading">
+            <p class="cotacoes-eyebrow">Logística</p>
+            <h2 id="cotacoes-titulo">Cotação de Preços</h2>
+            <p id="cotacoes-planilha-ajuda">Calculadora temporária. Os dados permanecem somente nesta página e não são salvos.</p>
+          </div>
+
+          <div class="cotacoes-toolbar" role="group" aria-label="Ações da calculadora de cotação">
+            <button id="cotacoes-adicionar-item" class="cotacoes-btn cotacoes-btn-primary" type="button">+ Adicionar Produto</button>
+            <button id="cotacoes-adicionar-fornecedor" class="cotacoes-btn cotacoes-btn-primary" type="button">+ Adicionar Fornecedor</button>
+            <button id="cotacoes-imprimir" class="cotacoes-btn cotacoes-btn-print" type="button">Imprimir</button>
+            <button id="cotacoes-limpar" class="cotacoes-btn cotacoes-btn-ghost" type="button">Limpar Tabela</button>
+          </div>
+        </header>
+
+        <div id="cotacoes-fornecedor-modal" class="cotacoes-supplier-modal" hidden>
+          <div class="cotacoes-supplier-dialog" role="dialog" aria-modal="true" aria-labelledby="cotacoes-fornecedor-modal-titulo">
+            <div class="cotacoes-supplier-dialog-header">
+              <div>
+                <p class="cotacoes-eyebrow">Cadastro compartilhado</p>
+                <h3 id="cotacoes-fornecedor-modal-titulo">Adicionar fornecedor</h3>
+              </div>
+              <button id="cotacoes-fornecedor-fechar" type="button" class="cotacoes-supplier-close" aria-label="Fechar">×</button>
+            </div>
+            <div id="cotacoes-fornecedor-lista" class="cotacoes-supplier-list"></div>
+            <button id="cotacoes-fornecedor-novo" type="button" class="cotacoes-btn cotacoes-btn-ghost">+ Adicionar novo</button>
+            <form id="cotacoes-fornecedor-form" class="cotacoes-supplier-form" hidden>
+              <div class="cotacoes-field">
+                <label for="cotacoes-fornecedor-nome">Nome do fornecedor</label>
+                <input id="cotacoes-fornecedor-nome" type="text" maxlength="160" required>
+              </div>
+              <div class="cotacoes-field">
+                <label for="cotacoes-fornecedor-apelido">Nome curto (opcional)</label>
+                <input id="cotacoes-fornecedor-apelido" type="text" maxlength="80">
+              </div>
+              <div class="cotacoes-field">
+                <label for="cotacoes-fornecedor-forma">Forma de pagamento</label>
+                <select id="cotacoes-fornecedor-forma" required>
+                  <option value="PIX">PIX</option>
+                  <option value="Boleto">Boleto</option>
+                </select>
+              </div>
+              <div id="cotacoes-fornecedor-campos-pix">
+                <div class="cotacoes-field">
+                  <label for="cotacoes-fornecedor-tipo">Tipo da chave PIX</label>
+                  <select id="cotacoes-fornecedor-tipo" required>
+                    <option value="">Selecione...</option>
+                    <option value="CPF">CPF</option><option value="CNPJ">CNPJ</option>
+                    <option value="Telefone">Telefone</option><option value="Email">E-mail</option>
+                    <option value="Aleatoria">Chave aleatória</option>
+                  </select>
+                </div>
+                <div class="cotacoes-field">
+                  <label for="cotacoes-fornecedor-chave">Chave PIX</label>
+                  <input id="cotacoes-fornecedor-chave" type="text" maxlength="180" required>
+                </div>
+              </div>
+              <p id="cotacoes-fornecedor-erro" class="cotacoes-supplier-error" role="alert"></p>
+              <div class="cotacoes-supplier-actions">
+                <button type="submit" class="cotacoes-btn cotacoes-btn-primary">Salvar e adicionar</button>
+                <button id="cotacoes-fornecedor-cancelar" type="button" class="cotacoes-btn cotacoes-btn-ghost">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <section class="cotacoes-sheet-panel" aria-labelledby="cotacoes-planilha-titulo">
+          <h3 id="cotacoes-planilha-titulo" class="sr-only">Planilha comparativa de produtos e fornecedores</h3>
+          <div id="cotacoes-sheet-status" class="cotacoes-sheet-status" role="status" aria-live="polite" aria-atomic="true">
+            Adicione produtos e fornecedores para iniciar a comparação.
+          </div>
+          <div
+            id="cotacoes-tabela-wrap"
+            class="cotacoes-sheet-wrap"
+            tabindex="0"
+            role="region"
+            aria-label="Planilha de cotação de preços"
+            aria-describedby="cotacoes-planilha-ajuda"
+          >
+            <p class="cotacoes-empty">A planilha está vazia.</p>
+          </div>
+        </section>
+
+        <section id="cotacoes-resumo" class="cotacoes-summary-strip" aria-label="Resumo financeiro da cotação" aria-live="polite" aria-atomic="true">
+          <p class="cotacoes-summary-empty">Preencha a planilha para visualizar o fornecedor recomendado e o potencial de negociação.</p>
+        </section>
+
+        <section class="cotacoes-print-fields" aria-labelledby="cotacoes-dados-impressao-titulo">
+          <div class="cotacoes-section-heading">
+            <h3 id="cotacoes-dados-impressao-titulo">Dados opcionais para impressão</h3>
+            <p>Estas informações também são temporárias e não criam um fluxo de aprovação.</p>
+          </div>
+
+          <div class="cotacoes-print-fields-grid">
+            <div class="cotacoes-field">
+              <label for="cotacao-numero">Número da cotação</label>
+              <input id="cotacao-numero" data-impressao-campo="numero" type="text" maxlength="80" autocomplete="off" placeholder="Ex.: 210726">
+            </div>
+            <div class="cotacoes-field">
+              <label for="cotacao-data">Data</label>
+              <input id="cotacao-data" data-impressao-campo="data" type="date">
+            </div>
+            <div class="cotacoes-field">
+              <label for="cotacao-elaborado-por">Elaborado por</label>
+              <input id="cotacao-elaborado-por" data-impressao-campo="elaboradoPor" type="text" maxlength="160" autocomplete="name">
+            </div>
+            <div class="cotacoes-field">
+              <label for="cotacao-aprovado-por">Aprovado por</label>
+              <input id="cotacao-aprovado-por" data-impressao-campo="aprovadoPor" type="text" maxlength="160" autocomplete="off">
+            </div>
+            <div class="cotacoes-field cotacoes-field-wide">
+              <label for="cotacao-descricao">Descrição/resumo da compra</label>
+              <textarea id="cotacao-descricao" data-impressao-campo="descricao" rows="3" maxlength="2000" placeholder="Descreva brevemente a necessidade da compra"></textarea>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="cotacoes-print-preview" class="cotacoes-print-modal" role="dialog" aria-modal="true" aria-labelledby="cotacoes-print-title" tabindex="-1" hidden>
+        <div class="cotacoes-print-toolbar">
+          <div>
+            <p class="cotacoes-eyebrow">Documento temporário</p>
+            <h2 id="cotacoes-print-title">Pré-visualização da impressão</h2>
+          </div>
+          <div class="cotacoes-print-toolbar-actions">
+            <button id="cotacoes-print-executar" class="cotacoes-btn cotacoes-btn-primary" type="button">Imprimir / Salvar PDF</button>
+            <button id="cotacoes-print-fechar" class="cotacoes-btn cotacoes-btn-ghost" type="button">Fechar</button>
+          </div>
+        </div>
+        <div id="cotacoes-print-document" class="cotacoes-print-document" aria-live="polite"></div>
+      </div>
+    </section>
+    <!-- TELA 9 - DASHBOARD -->
+    <section id="tela-dashboard" class="tela">
+      <div class="tela-titulo"><h2>Dashboard</h2><p class="subtitulo">Relatorios e indicadores conectados ao Power BI.</p></div>
+      <div class="card" style="width:100%;height:calc(100vh - 200px);padding:0;overflow:hidden;">
+        <iframe id="powerbi-iframe" title="Ligações" src="https://app.powerbi.com/view?r=eyJrIjoiMGIyZmYwNzMtZGY3YS00NWYzLWEyOGQtODI5MjczZjBiMGU0IiwidCI6IjY1OWNlMmI4LTA3MTQtNDE5OC04YzM4LWRjOWI2MGFhYmI1NyJ9" style="width:100%;height:100%;border:none;" allowfullscreen></iframe>
+        <div id="powerbi-placeholder" style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;color:#888;">
+          <p style="font-size:1.2rem;">Nenhum relatorio Power BI configurado.</p>
+          <p>Edite a URL do iframe em funcionario.js para conectar seu relatorio.</p>
+        </div>
+      </div>
+    </section>
+    <!-- MODAL CRM — criado dinamicamente por crmAbrirModal() em funcionario.js -->
+  </main>
+  <footer class="rodape"><span>Calculadoras Industriais - Razor Industrial | Dados salvos no servidor.</span></footer>
+  <script src="js/app.js"></script>
+  <script src="js/cotacoes-financeiro.js"></script>
+  <script src="js/cotacoes-modelo.js"></script>
+  <script src="js/funcionario.js"></script>
+  <script src="js/cotacoes-print.js"></script>
+  <script src="js/cotacoes.js?v=3"></script>
+  <script src="js/cancelamentos.js"></script>
+  <script src="js/sidebar.js"></script>
+</body>
+</html>

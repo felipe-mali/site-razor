@@ -1,0 +1,255 @@
+/* ========================================
+   SIDEBAR — Razor Industrial (Modernized)
+   ======================================== */
+
+.sidebar-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 240px;
+  height: 100vh;
+  background: linear-gradient(180deg, #111111 0%, #0d0d0d 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s ease, transform 0.25s ease;
+  overflow: hidden;
+}
+
+.sidebar.colapsada {
+  width: 52px;
+}
+
+.sidebar-toggle {
+  width: 100%;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.02);
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #F4A41C;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.sidebar-content::-webkit-scrollbar {
+  width: 3px;
+}
+.sidebar-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+
+.sidebar-grupo {
+  margin-bottom: 2px;
+}
+
+.sidebar-grupo-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(244, 164, 28, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.sidebar-grupo-titulo:hover {
+  color: #F4A41C;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebar-seta {
+  font-size: 9px;
+  transition: transform 0.2s ease;
+}
+.sidebar-grupo.fechar .sidebar-seta {
+  transform: rotate(-90deg);
+}
+
+.sidebar-itens {
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+.sidebar-grupo.fechar .sidebar-itens {
+  max-height: 0 !important;
+}
+
+.sidebar-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.sidebar-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.sidebar-btn:hover .sidebar-icon,
+.sidebar-btn.ativo .sidebar-icon {
+  opacity: 1;
+}
+
+.sidebar-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #ccc;
+}
+
+.sidebar-btn.ativo {
+  background: rgba(244, 164, 28, 0.08);
+  color: #F4A41C;
+  font-weight: 600;
+}
+
+.sidebar-btn.ativo::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: #F4A41C;
+  border-radius: 1px;
+}
+
+.sidebar-btn:focus-visible {
+  outline: 2px solid #F4A41C;
+  outline-offset: -2px;
+}
+
+.sidebar-label {
+  transition: opacity 0.2s ease;
+}
+
+/* Sidebar colapsada */
+.sidebar.colapsada .sidebar-grupo-titulo span:first-child,
+.sidebar.colapsada .sidebar-label {
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  overflow: hidden;
+}
+.sidebar.colapsada .sidebar-btn {
+  justify-content: center;
+  padding: 9px 0;
+}
+.sidebar.colapsada .sidebar-grupo-titulo {
+  justify-content: center;
+  padding: 6px 0;
+}
+.sidebar.colapsada .sidebar-seta {
+  display: none;
+}
+.sidebar.colapsada .sidebar-btn.ativo::before {
+  left: 0;
+}
+.sidebar.colapsada .sidebar-icon {
+  opacity: 1;
+}
+
+/* Header and panel need margin for sidebar */
+body.sidebar-page #navbar,
+body.sidebar-page .panel-header {
+  margin-left: 240px;
+  transition: margin-left 0.25s ease;
+}
+body.sidebar-page .sidebar.colapsada ~ #navbar,
+body.sidebar-page .sidebar.colapsada ~ .panel-header,
+body.sidebar-page .sidebar.colapsada ~ * > #navbar {
+  margin-left: 52px;
+}
+
+/* Main content margin */
+body.sidebar-page .main-content {
+  max-width: none;
+  margin: 0;
+  padding: 24px 20px 40px;
+  margin-left: 240px;
+  transition: margin-left 0.25s ease;
+}
+body.sidebar-page .sidebar.colapsada ~ .sidebar-main {
+  margin-left: 52px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    width: 240px;
+  }
+  .sidebar.aberta {
+    transform: translateX(0);
+  }
+  .sidebar.colapsada {
+    width: 240px;
+    transform: translateX(-100%);
+  }
+  .sidebar.colapsada.aberta {
+    transform: translateX(0);
+  }
+  body.sidebar-page #navbar,
+  body.sidebar-page .panel-header,
+  body.sidebar-page .main-content,
+  body.sidebar-page .sidebar-main {
+    margin-left: 0 !important;
+  }
+  .sidebar-mobile-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 490;
+  }
+  .sidebar-mobile-overlay.ativo {
+    display: block;
+  }
+}
+
+/* Colapsada: sobrescrever largura forçada */
+aside.sidebar.colapsada {
+  width: 52px !important;
+}

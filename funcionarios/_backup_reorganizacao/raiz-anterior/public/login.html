@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0A0A0A">
+  <title>Login - Razor Indústria</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/premium.css">
+</head>
+<body class="login-page">
+  <div class="login-box">
+    <img src="fotos/logo.jpg" alt="Razor Indústria" class="logo">
+    <h1>Área do Colaborador</h1>
+    <form id="login-form">
+      <input type="text" id="usuario" placeholder="Usuário" required autocomplete="username">
+      <input type="password" id="senha" placeholder="Senha" required autocomplete="current-password">
+      <button type="submit" class="btn" style="width:100%;margin-top:4px">Entrar</button>
+      <p class="error-msg" id="error-msg"></p>
+    </form>
+    <a href="index.html" class="voltar">← Voltar ao site</a>
+  </div>
+  <script src="js/login.js"></script>
+</body>
+</html>

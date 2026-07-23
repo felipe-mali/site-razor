@@ -1,0 +1,67 @@
+{
+  "funcionarios": [
+    {
+      "id": "mrtmgl63hy72",
+      "funcionario": "ANDRE LUIZ RIBEIRO DA SILVA JUNIOR",
+      "apelido": "André",
+      "tipo_pix": "CPF",
+      "chave_pix": "47045033800",
+      "created_at": "2026-07-20T19:32:57.771Z",
+      "updated_at": "2026-07-20T19:32:57.771Z"
+    },
+    {
+      "id": "mrtmi3dsbc8j",
+      "funcionario": "ANTONIO DO NASCIMENTO SILVA",
+      "apelido": "Antonio",
+      "tipo_pix": "Telefone",
+      "chave_pix": "16988139269",
+      "created_at": "2026-07-20T19:34:08.032Z",
+      "updated_at": "2026-07-20T19:34:08.032Z"
+    },
+    {
+      "id": "mrtmjrf3mdss",
+      "funcionario": "CARLOS YURE DE PAULA SOUSA",
+      "apelido": "Yuri",
+      "tipo_pix": "CPF",
+      "chave_pix": "01843276879",
+      "created_at": "2026-07-20T19:35:25.839Z",
+      "updated_at": "2026-07-20T19:35:25.839Z"
+    },
+    {
+      "id": "mrtmkbh9qoj1",
+      "funcionario": "KELVIN PAES DOS SANTOS BRITTO",
+      "apelido": "Kelvin",
+      "tipo_pix": "CPF",
+      "chave_pix": "38822642848",
+      "created_at": "2026-07-20T19:35:51.837Z",
+      "updated_at": "2026-07-20T19:35:51.837Z"
+    },
+    {
+      "id": "mrtml02n6puo",
+      "funcionario": "MIQUEIAS LEVI DE OLIVEIRA FAVARO",
+      "apelido": "Miqueias",
+      "tipo_pix": "Telefone",
+      "chave_pix": "16993293624",
+      "created_at": "2026-07-20T19:36:23.711Z",
+      "updated_at": "2026-07-20T19:36:23.711Z"
+    },
+    {
+      "id": "mrxluxpo7u07",
+      "funcionario": "Jhonatan dos Santos Silva",
+      "apelido": "Jhon",
+      "tipo_pix": "CPF",
+      "chave_pix": "40344571807",
+      "created_at": "2026-07-23T14:27:12.300Z",
+      "updated_at": "2026-07-23T14:27:12.300Z"
+    },
+    {
+      "id": "mrxlw42q55fa",
+      "funcionario": "Felipe dos Santos Silva",
+      "apelido": "Felipe Baiano",
+      "tipo_pix": "Telefone",
+      "chave_pix": "16982207405",
+      "created_at": "2026-07-23T14:28:07.202Z",
+      "updated_at": "2026-07-23T14:28:07.202Z"
+    }
+  ]
+}

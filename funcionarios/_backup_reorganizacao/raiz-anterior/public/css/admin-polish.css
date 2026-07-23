@@ -1,0 +1,261 @@
+/* Camada de polimento visual do painel. Escopo intencionalmente restrito. */
+.panel-page {
+  --admin-bg: #0c0d0c;
+  --admin-card: #151715;
+  --admin-elevated: #191b19;
+  --admin-surface: #222522;
+  --admin-border: rgba(255, 255, 255, 0.075);
+  --admin-border-strong: rgba(255, 255, 255, 0.14);
+  --admin-text: #f1f2ef;
+  --admin-text-secondary: #a9ada7;
+  --admin-text-muted: #7f847e;
+  --admin-radius: 5px;
+  --admin-transition: 140ms ease;
+  --admin-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --admin-shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.25);
+  color-scheme: dark;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-page :where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #f4a41c;
+  outline-offset: 2px;
+}
+
+.panel-page #navbar {
+  min-height: 58px;
+  border-bottom-color: var(--admin-border);
+  background: rgba(12, 13, 12, 0.96);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.panel-page #navbar .container { min-height: 58px; }
+.panel-page #navbar nav { gap: 4px; }
+.panel-page #navbar nav a { padding: 7px 10px; }
+.panel-page #navbar nav a:not(.btn)::after { display: none; }
+.panel-page #navbar nav a.active {
+  color: #f4a41c;
+  background: rgba(244, 164, 28, 0.07);
+}
+.panel-page #navbar .logo { max-height: 34px; }
+
+.panel-page .panel-header {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-card);
+}
+.panel-page .panel-header h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--admin-text-secondary);
+}
+.panel-page .panel-header h1 span { color: var(--admin-text); font-weight: 600; }
+
+.panel-page .main-content { padding: 20px 24px 36px; }
+.panel-page .tela { animation-duration: 140ms; }
+.panel-page .tela-titulo {
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+}
+.panel-page .tela-titulo h2 {
+  font-family: 'Barlow Condensed', 'Segoe UI', sans-serif;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+.panel-page .subtitulo { margin-top: 2px; color: var(--admin-text-secondary); }
+
+.panel-page .card-grid { gap: 12px; }
+.panel-page .card,
+.panel-page .cancelamento-card {
+  padding: 16px;
+  border-color: var(--admin-border);
+  border-radius: var(--admin-radius);
+  box-shadow: none;
+}
+.panel-page .card:hover,
+.panel-page .cancelamento-card:hover { border-color: var(--admin-border-strong); }
+.panel-page .card-titulo {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  font-size: 13px;
+}
+.panel-page .card-desc { line-height: 1.45; }
+
+.panel-page .campo-grupo { margin-bottom: 10px; }
+.panel-page .campo-grupo label,
+.panel-page .modal-cancelamento-content label {
+  margin-bottom: 5px;
+  color: var(--admin-text-secondary);
+  font-size: 11px;
+  letter-spacing: 0.035em;
+}
+.panel-page :where(input, select, textarea) {
+  accent-color: #f4a41c;
+}
+.panel-page .campo-grupo :where(input, select, textarea),
+.panel-page .crm-filtros :where(input, select),
+.panel-page .modal-crm .campo-grupo :where(input, select, textarea),
+.panel-page .modal-cancelamento-content :where(input[type="text"], textarea) {
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  background: #101210;
+  transition: border-color var(--admin-transition), box-shadow var(--admin-transition);
+}
+.panel-page :where(input, select, textarea):disabled {
+  opacity: 0.62;
+  background: var(--admin-elevated);
+}
+
+.panel-page :where(.btn-limpar, .btn-imprimir, .btn-salvar, .btn-add-fator,
+  .btn-export, .btn-desbloquear, .btn-bloquear, .btn-foto, .btn-crm-novo,
+  .btn-novo-cancelamento, .btn-modal-salvar, .btn-modal-cancelar,
+  .btn-modal-confirmar, .crm-btn-editar, .crm-btn-excluir) {
+  min-height: 34px;
+  border-radius: 4px;
+  box-shadow: none;
+  transition: color var(--admin-transition), background-color var(--admin-transition),
+    border-color var(--admin-transition), opacity var(--admin-transition);
+}
+.panel-page :where(.btn-imprimir, .btn-salvar, .btn-add-fator, .btn-crm-novo,
+  .btn-novo-cancelamento, .btn-modal-salvar, .btn-modal-confirmar):hover:not(:disabled) {
+  opacity: 0.88;
+  transform: none;
+}
+.panel-page :where(.btn-limpar, .btn-export, .btn-bloquear, .btn-modal-cancelar):hover {
+  transform: none;
+}
+.panel-page .botoes-acao { margin-top: 12px; }
+
+.panel-page .resultado-grid { gap: 5px; }
+.panel-page .resultado-item {
+  min-height: 44px;
+  padding: 8px 11px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.16);
+}
+.panel-page .resultado-item.principal { color: #15120a; }
+.panel-page .aviso-box { border-radius: 3px; }
+
+.panel-page :where(.tabela-fatores-wrap, .tabela-pesos-wrap, .tabela-materiais-wrap,
+  .crm-tabela-wrap) {
+  overflow: auto;
+  border-color: var(--admin-border);
+  border-radius: 4px;
+  scrollbar-gutter: stable;
+}
+.panel-page :where(.tabela-fatores, .tabela-pesos, .tabela-materiais, .crm-tabela) {
+  font-variant-numeric: tabular-nums;
+}
+.panel-page :where(.tabela-fatores, .tabela-pesos, .tabela-materiais, .crm-tabela) th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 36px;
+  padding: 8px 10px;
+  background: #1c1f1c;
+  color: #c3c7c1;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.panel-page :where(.tabela-fatores, .tabela-pesos, .tabela-materiais, .crm-tabela) td {
+  height: 40px;
+  padding: 7px 10px;
+  border-bottom-color: var(--admin-border);
+}
+.panel-page :where(.tabela-fatores, .tabela-pesos, .tabela-materiais, .crm-tabela) tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.panel-page .sidebar {
+  background: #101210;
+  border-right-color: var(--admin-border);
+  transition-duration: 180ms;
+}
+.panel-page .sidebar-toggle {
+  height: 42px;
+  color: var(--admin-text-secondary);
+  background: transparent;
+}
+.panel-page .sidebar-toggle:hover { color: #f4a41c; background: rgba(255, 255, 255, 0.025); }
+.panel-page .sidebar-content { padding: 6px 0 12px; }
+.panel-page .sidebar-grupo { margin-bottom: 4px; }
+.panel-page .sidebar-grupo-titulo {
+  padding: 7px 14px;
+  color: #858a83;
+  letter-spacing: 0.075em;
+}
+.panel-page .sidebar-grupo-titulo:hover { color: #bec2bc; background: transparent; }
+.panel-page .sidebar-btn {
+  min-height: 36px;
+  padding: 8px 14px;
+  color: #a1a59f;
+  transition: color var(--admin-transition), background-color var(--admin-transition);
+}
+.panel-page .sidebar-btn:hover { color: #e1e3df; background: rgba(255, 255, 255, 0.035); }
+.panel-page .sidebar-btn.ativo {
+  color: #f5b84e;
+  background: rgba(244, 164, 28, 0.075);
+}
+.panel-page .sidebar-btn.ativo::before { top: 7px; bottom: 7px; border-radius: 0; }
+
+.panel-page :where(.modal, .modal-cancelamento-content, .modal-senha-content, .modal-crm .modal-crm-box) {
+  border-radius: 6px;
+  border-color: var(--admin-border-strong);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+.panel-page :where(.modal-overlay, .modal-cancelamento, .modal-senha) {
+  backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.72);
+}
+.panel-page .modal-cancelamento-content { padding: 20px; }
+.panel-page .modal-cancelamento-content h2 { font-size: 17px; }
+.panel-page .modal-cancelamento-content .modal-subtitle { margin-bottom: 16px; }
+.panel-page .modal-cancelamento-botoes { margin-top: 16px; }
+
+/* A planilha mantém a estrutura e ganha leitura mais sóbria. */
+.panel-page .cotacoes-app {
+  --cot-panel-raised: #1b1e1b;
+  --cot-border-soft: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+.panel-page .cotacoes-page-header { margin-bottom: 10px; }
+.panel-page .cotacoes-table-shell { border-radius: 3px; }
+.panel-page .cotacoes-sheet-scroll { overscroll-behavior-inline: contain; }
+.panel-page .cotacoes-sheet-table tbody tr { transition: none; }
+.panel-page .cotacoes-sheet-table input { border-radius: 2px; }
+.panel-page .cotacoes-summary-strip,
+.panel-page .cotacoes-print-fields { border-radius: 3px; }
+
+@media (max-width: 900px) {
+  .panel-page .main-content { padding: 16px 16px 28px; }
+  .panel-page .card-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .panel-page .panel-header { padding-inline: 14px; }
+  .panel-page .main-content { padding: 14px 12px 24px; }
+  .panel-page .tela-titulo { margin-bottom: 12px; }
+  .panel-page .card,
+  .panel-page .cancelamento-card { padding: 13px; }
+  .panel-page .botoes-acao > button { flex: 1 1 130px; }
+  .panel-page .modal-cancelamento-content { padding: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-page *,
+  .panel-page *::before,
+  .panel-page *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .panel-page { color-scheme: light; }
+}
