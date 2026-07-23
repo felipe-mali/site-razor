@@ -1,4 +1,4 @@
-﻿/* ========================================
+/* ========================================
    CALCULADORAS RAZOR INDUSTRIAL — app.js (consolidado)
    ======================================== */
 
@@ -1216,6 +1216,8 @@ async function fotosCriarPastaUI() {
 const CRM_DB_NAME = 'razor-crm';
 const CRM_DB_VERSION = 1;
 const CRM_STORE = 'clientes';
+let crmFiltroVendedor = '';
+let crmBusca = '';
 
 function abrirDBCRM() {
   return new Promise((resolve, reject) => {
@@ -1264,9 +1266,6 @@ async function crmExcluirCliente(id) {
     req.onerror = () => reject(req.error);
   });
 }
-
-let crmFiltroVendedor = '';
-let crmBusca = '';
 
 async function crmRenderizar() {
   const clientes = await crmCarregarClientes();

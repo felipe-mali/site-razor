@@ -60,7 +60,10 @@ try {
 
 // Middleware de autenticação
 function authenticate(req, res, next) {
-  const token = req.cookies.token || (req.headers.authorization || '').replace('Bearer ', '');
+  // O painel usa Authorization. Priorizá-lo evita que um cookie antigo invalide
+  // uma sessão recém-criada pelo login.
+  const tokenHeader = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const token = tokenHeader || req.cookies.token;
   if (!token || !sessions.has(token)) {
     return res.status(401).json({ error: 'Não autorizado' });
   }
@@ -70,6 +73,21 @@ function authenticate(req, res, next) {
 
 function requireAdmin(req, res, next) {
   if (!req.user.pode_gerenciar_permissoes) {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+  next();
+}
+
+function requireCotacoes(req, res, next) {
+  if (
+    req.user.ativo === false ||
+    !(
+      req.user.cargo === 'admin' ||
+      req.user.cargo === 'logistica' ||
+      req.user.pode_gerenciar_permissoes ||
+      req.user.pode_acessar_cotacoes
+    )
+  ) {
     return res.status(403).json({ error: 'Acesso negado' });
   }
   next();
@@ -86,6 +104,7 @@ app.post('/api/login', (req, res) => {
     }
     const token = Math.random().toString(36).substring(7);
     sessions.set(token, { ...users[usuario], usuario });
+    res.clearCookie('token');
     res.json({ success: true, token, user: { nome: users[usuario].nome, ...users[usuario] } });
   } else {
     res.status(401).json({ error: 'Credenciais inválidas' });
@@ -94,8 +113,9 @@ app.post('/api/login', (req, res) => {
 
 // Logout
 app.post('/api/logout', (req, res) => {
-  const token = req.headers.authorization.replace('Bearer ', '');
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || req.cookies.token;
   if (token) sessions.delete(token);
+  res.clearCookie('token');
   res.json({ success: true });
 });
 
@@ -577,6 +597,30 @@ function salvarChaves(lista) {
   fs.writeFileSync(CHAVES_PATH, JSON.stringify({ funcionarios: lista }, null, 2));
 }
 
+const FORNECEDORES_PATH = path.join(__dirname, 'data', 'fornecedores_pagamento.json');
+
+function carregarFornecedoresPagamento() {
+  try {
+    if (!fs.existsSync(FORNECEDORES_PATH)) {
+      fs.writeFileSync(FORNECEDORES_PATH, JSON.stringify({ fornecedores: [] }, null, 2));
+      return [];
+    }
+    const data = JSON.parse(fs.readFileSync(FORNECEDORES_PATH, 'utf8'));
+    return Array.isArray(data.fornecedores) ? data.fornecedores : [];
+  } catch {
+    return [];
+  }
+}
+
+function salvarFornecedoresPagamento(lista) {
+  fs.writeFileSync(FORNECEDORES_PATH, JSON.stringify({ fornecedores: lista }, null, 2));
+}
+
+function normalizarFormaPagamento(valor) {
+  const forma = String(valor || '').trim().toLocaleLowerCase('pt-BR');
+  return forma === 'boleto' ? 'Boleto' : 'PIX';
+}
+
 // Sanitizacao basica
 function sanitizar(str) {
   if (!str) return '';
@@ -705,6 +749,106 @@ app.delete('/api/chaves-pagamento/:id', authenticate, requireAdmin, (req, res) =
   if (idx === -1) return res.status(404).json({ error: 'Funcionario nao encontrado.' });
   lista.splice(idx, 1);
   salvarChaves(lista);
+  res.json({ success: true });
+});
+
+// Cadastro compartilhado: o Admin consulta as chaves e a Logistica usa os
+// mesmos fornecedores na calculadora de cotacoes.
+app.get('/api/fornecedores-pagamento', authenticate, requireCotacoes, (req, res) => {
+  const fornecedores = carregarFornecedoresPagamento();
+  if (!req.user.pode_gerenciar_permissoes) {
+    return res.json({
+      fornecedores: fornecedores.map(({ id, nome, apelido, forma_pagamento }) => ({
+        id,
+        nome,
+        apelido,
+        forma_pagamento: forma_pagamento || 'PIX'
+      }))
+    });
+  }
+  res.json({ fornecedores });
+});
+
+app.post('/api/fornecedores-pagamento', authenticate, requireCotacoes, (req, res) => {
+  let { nome, apelido, forma_pagamento, tipo_pix, chave_pix } = req.body;
+  nome = sanitizar(nome);
+  apelido = sanitizar(apelido);
+  forma_pagamento = normalizarFormaPagamento(forma_pagamento);
+  tipo_pix = (tipo_pix || '').trim();
+  chave_pix = (chave_pix || '').trim();
+
+  if (!nome) return res.status(400).json({ error: 'Nome do fornecedor e obrigatorio.' });
+  if (forma_pagamento === 'PIX') {
+    if (!TIPOS_CHAVE_VALIDOS.includes(tipo_pix)) return res.status(400).json({ error: 'Tipo de chave invalido.' });
+    const erroFormato = validarFormatoChave(tipo_pix, chave_pix);
+    if (erroFormato) return res.status(400).json({ error: erroFormato });
+  } else {
+    tipo_pix = '';
+    chave_pix = '';
+  }
+
+  const lista = carregarFornecedoresPagamento();
+  if (lista.some(f => f.nome.toLowerCase() === nome.toLowerCase())) {
+    return res.status(400).json({ error: 'Ja existe um fornecedor com este nome.' });
+  }
+  if (chave_pix && lista.some(f => f.chave_pix === chave_pix)) {
+    return res.status(400).json({ error: 'Esta chave PIX ja esta cadastrada.' });
+  }
+
+  const agora = new Date().toISOString();
+  const fornecedor = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    nome,
+    apelido: apelido || '',
+    forma_pagamento,
+    tipo_pix,
+    chave_pix,
+    created_at: agora,
+    updated_at: agora
+  };
+  lista.push(fornecedor);
+  salvarFornecedoresPagamento(lista);
+  res.json({ success: true, fornecedor });
+});
+
+app.put('/api/fornecedores-pagamento/:id', authenticate, requireAdmin, (req, res) => {
+  let { nome, apelido, forma_pagamento, tipo_pix, chave_pix } = req.body;
+  nome = sanitizar(nome);
+  apelido = sanitizar(apelido);
+  forma_pagamento = normalizarFormaPagamento(forma_pagamento);
+  tipo_pix = (tipo_pix || '').trim();
+  chave_pix = (chave_pix || '').trim();
+
+  if (!nome) return res.status(400).json({ error: 'Nome do fornecedor e obrigatorio.' });
+  if (forma_pagamento === 'PIX') {
+    if (!TIPOS_CHAVE_VALIDOS.includes(tipo_pix)) return res.status(400).json({ error: 'Tipo de chave invalido.' });
+    const erroFormato = validarFormatoChave(tipo_pix, chave_pix);
+    if (erroFormato) return res.status(400).json({ error: erroFormato });
+  } else {
+    tipo_pix = '';
+    chave_pix = '';
+  }
+
+  const lista = carregarFornecedoresPagamento();
+  const idx = lista.findIndex(f => f.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Fornecedor nao encontrado.' });
+  if (lista.some((f, i) => i !== idx && f.nome.toLowerCase() === nome.toLowerCase())) {
+    return res.status(400).json({ error: 'Ja existe um fornecedor com este nome.' });
+  }
+  if (chave_pix && lista.some((f, i) => i !== idx && f.chave_pix === chave_pix)) {
+    return res.status(400).json({ error: 'Esta chave PIX ja esta cadastrada.' });
+  }
+  lista[idx] = { ...lista[idx], nome, apelido: apelido || '', forma_pagamento, tipo_pix, chave_pix, updated_at: new Date().toISOString() };
+  salvarFornecedoresPagamento(lista);
+  res.json({ success: true, fornecedor: lista[idx] });
+});
+
+app.delete('/api/fornecedores-pagamento/:id', authenticate, requireAdmin, (req, res) => {
+  const lista = carregarFornecedoresPagamento();
+  const idx = lista.findIndex(f => f.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Fornecedor nao encontrado.' });
+  lista.splice(idx, 1);
+  salvarFornecedoresPagamento(lista);
   res.json({ success: true });
 });
 

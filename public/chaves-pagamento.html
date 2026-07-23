@@ -37,7 +37,25 @@
   </div>
 
   <main class="container permissoes-page">
+    <div class="perm-header" style="margin-bottom:12px;">
+      <div>
+        <h2>Fornecedores</h2>
+        <p style="color:var(--text-secondary);margin-top:4px;">Chaves usadas pela Logística nas cotações.</p>
+      </div>
+      <button class="btn" onclick="abrirModalFornecedor()">+ Novo Fornecedor</button>
+    </div>
+    <div class="table-wrapper" style="margin-bottom:40px;">
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Fornecedor</th><th>Pagamento</th><th>Dados</th><th>Ações</th></tr></thead>
+          <tbody id="tabela-fornecedores"></tbody>
+        </table>
+      </div>
+      <p id="msg-fornecedores-vazio" style="display:none;text-align:center;padding:32px;color:var(--text-secondary);">Nenhum fornecedor cadastrado.</p>
+    </div>
+
     <div class="perm-header">
+      <div><h2>Funcionários</h2></div>
       <input type="text" id="busca" placeholder="Buscar por nome..." class="input-busca">
       <button class="btn" onclick="abrirModal()">+ Novo Funcionario</button>
     </div>
@@ -98,6 +116,50 @@
     </div>
   </div>
 
+  <div id="modal-fornecedor" class="modal">
+    <div class="modal-content">
+      <h2 id="modal-fornecedor-title">Novo Fornecedor</h2>
+      <form id="fornecedor-form">
+        <input type="hidden" id="fornecedor-edit-id">
+        <div class="form-group">
+          <label for="fornecedor-nome">Nome do Fornecedor *</label>
+          <input type="text" id="fornecedor-nome" required placeholder="Razão social ou nome">
+        </div>
+        <div class="form-group">
+          <label for="fornecedor-apelido">Nome curto</label>
+          <input type="text" id="fornecedor-apelido" placeholder="Nome exibido na cotação (opcional)">
+        </div>
+        <div class="form-group">
+          <label for="fornecedor-forma">Forma de Pagamento *</label>
+          <select id="fornecedor-forma" required>
+            <option value="PIX">PIX</option>
+            <option value="Boleto">Boleto</option>
+          </select>
+        </div>
+        <div id="fornecedor-campos-pix">
+        <div class="form-group">
+          <label for="fornecedor-tipo">Tipo da Chave PIX *</label>
+          <select id="fornecedor-tipo" required>
+            <option value="">Selecione...</option>
+            <option value="CPF">CPF</option><option value="CNPJ">CNPJ</option>
+            <option value="Telefone">Telefone</option><option value="Email">Email</option>
+            <option value="Aleatoria">Chave Aleatória</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="fornecedor-chave">Chave PIX *</label>
+          <input type="text" id="fornecedor-chave" required placeholder="Chave PIX">
+        </div>
+        </div>
+        <p id="fornecedor-msg-erro" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none;"></p>
+        <div class="modal-buttons">
+          <button type="submit" class="btn">Salvar</button>
+          <button type="button" class="btn btn-secondary" onclick="fecharModalFornecedor()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Modal Confirmacao Exclusao -->
   <div id="modal-confirm" class="modal">
     <div class="modal-content">
@@ -110,6 +172,6 @@
     </div>
   </div>
 
-  <script src="js/chaves-pagamento.js"></script>
+  <script src="js/chaves-pagamento.js?v=3"></script>
 </body>
 </html>

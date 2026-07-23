@@ -28,11 +28,24 @@ const CARGOS_LABELS = {
 
 // Carregar usuários
 async function carregarUsuarios() {
-  const response = await fetch('/api/usuarios', {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  const usuarios = await response.json();
   const tbody = document.getElementById('tabela-usuarios');
+  let response;
+  try {
+    response = await fetch('/api/usuarios', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = 'login.html';
+      return;
+    }
+    if (!response.ok) throw new Error('Não foi possível carregar os usuários.');
+  } catch (erro) {
+    tbody.innerHTML = `<tr><td colspan="9">${erro.message}</td></tr>`;
+    return;
+  }
+  const usuarios = await response.json();
 
   tbody.innerHTML = Object.entries(usuarios).map(([key, u]) => `
     <tr>

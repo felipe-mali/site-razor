@@ -10,6 +10,7 @@
   var inicializado = false;
   var focoAntesDaPrevia = null;
   var timerStatus = null;
+  var fornecedoresCadastrados = [];
 
   function porId(id) {
     return document.getElementById(id);
@@ -343,25 +344,116 @@
     mostrarStatus('Produto adicionado. Preencha a descrição e a quantidade.', 'success', true);
   }
 
-  function adicionarFornecedor() {
-    if (!autorizarOuNegar()) return;
-    var nome = window.prompt('Nome do fornecedor:');
-    if (nome === null) return;
-    nome = nome.trim();
-    if (!nome) {
-      mostrarStatus('Informe o nome do fornecedor.', 'error', true);
-      return;
-    }
+  function inserirFornecedorNaCotacao(nome) {
+    nome = (nome || '').trim();
+    if (!nome) return false;
     var duplicado = estado.fornecedores.some(function (fornecedor) {
       return fornecedor.nome.toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR');
     });
     if (duplicado) {
-      mostrarStatus('Já existe um fornecedor com esse nome.', 'error', true);
-      return;
+      mostrarStatus('Esse fornecedor já está nesta cotação.', 'error', true);
+      return false;
     }
     var fornecedor = Modelo.adicionarFornecedor(estado, nome);
     renderizarTabela({ tipo: 'fornecedor', id: fornecedor.id });
     mostrarStatus('Fornecedor adicionado à planilha.', 'success', true);
+    return true;
+  }
+
+  function nomeFornecedorCadastrado(fornecedor) {
+    return (fornecedor.apelido || fornecedor.nome || '').trim();
+  }
+
+  function renderizarFornecedoresCadastrados() {
+    if (!fornecedoresCadastrados.length) {
+      elementos.fornecedorLista.innerHTML = '<p class="cotacoes-supplier-empty">Nenhum fornecedor cadastrado. Cadastre o primeiro abaixo.</p>';
+      return;
+    }
+    elementos.fornecedorLista.innerHTML = fornecedoresCadastrados.map(function (fornecedor) {
+      return '<button type="button" class="cotacoes-supplier-option" data-selecionar-fornecedor="' + escapar(fornecedor.id) + '">' +
+        '<strong>' + escapar(nomeFornecedorCadastrado(fornecedor)) + '</strong>' +
+        '<small>' + escapar(fornecedor.forma_pagamento || 'PIX') + '</small></button>';
+    }).join('');
+  }
+
+  async function carregarFornecedoresCadastrados() {
+    var resposta = await window.fetch('/api/fornecedores-pagamento', {
+      headers: { 'Authorization': 'Bearer ' + window.localStorage.getItem('token') }
+    });
+    if (resposta.status === 401) {
+      window.localStorage.removeItem('token');
+      window.localStorage.removeItem('user');
+      window.location.href = 'login.html';
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+    if (!resposta.ok) throw new Error('Não foi possível carregar os fornecedores.');
+    fornecedoresCadastrados = (await resposta.json()).fornecedores || [];
+    renderizarFornecedoresCadastrados();
+  }
+
+  function fecharModalFornecedor() {
+    elementos.fornecedorModal.hidden = true;
+    elementos.fornecedorForm.hidden = true;
+    elementos.fornecedorNovo.hidden = false;
+    elementos.fornecedorErro.textContent = '';
+  }
+
+  async function adicionarFornecedor() {
+    if (!autorizarOuNegar()) return;
+    elementos.fornecedorModal.hidden = false;
+    elementos.fornecedorLista.innerHTML = '<p class="cotacoes-supplier-empty">Carregando fornecedores...</p>';
+    try {
+      await carregarFornecedoresCadastrados();
+    } catch (erro) {
+      elementos.fornecedorLista.innerHTML = '<p class="cotacoes-supplier-error">' + escapar(erro.message) + '</p>';
+    }
+  }
+
+  function selecionarFornecedorCadastrado(evento) {
+    var botao = evento.target.closest('[data-selecionar-fornecedor]');
+    if (!botao) return;
+    var fornecedor = fornecedoresCadastrados.find(function (item) {
+      return item.id === botao.dataset.selecionarFornecedor;
+    });
+    if (fornecedor && inserirFornecedorNaCotacao(nomeFornecedorCadastrado(fornecedor))) fecharModalFornecedor();
+  }
+
+  function atualizarCamposPixFornecedor() {
+    var usaPix = elementos.fornecedorForma.value === 'PIX';
+    elementos.fornecedorCamposPix.hidden = !usaPix;
+    elementos.fornecedorTipo.required = usaPix;
+    elementos.fornecedorChave.required = usaPix;
+  }
+
+  async function salvarNovoFornecedor(evento) {
+    evento.preventDefault();
+    elementos.fornecedorErro.textContent = '';
+    var body = {
+      nome: elementos.fornecedorNome.value.trim(),
+      apelido: elementos.fornecedorApelido.value.trim(),
+      forma_pagamento: elementos.fornecedorForma.value,
+      tipo_pix: elementos.fornecedorForma.value === 'PIX' ? elementos.fornecedorTipo.value : '',
+      chave_pix: elementos.fornecedorForma.value === 'PIX' ? elementos.fornecedorChave.value.trim() : ''
+    };
+    try {
+      var resposta = await window.fetch('/api/fornecedores-pagamento', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + window.localStorage.getItem('token')
+        },
+        body: JSON.stringify(body)
+      });
+      var data = await resposta.json();
+      if (!resposta.ok) throw new Error(data.error || 'Não foi possível salvar o fornecedor.');
+      fornecedoresCadastrados.push(data.fornecedor);
+      inserirFornecedorNaCotacao(nomeFornecedorCadastrado(data.fornecedor));
+      elementos.fornecedorForm.reset();
+      atualizarCamposPixFornecedor();
+      fecharModalFornecedor();
+    } catch (erro) {
+      elementos.fornecedorErro.textContent = erro.message;
+    }
   }
 
   function removerFornecedor(fornecedorId) {
@@ -595,6 +687,20 @@
   function registrarEventos() {
     elementos.adicionarProduto.addEventListener('click', adicionarProduto);
     elementos.adicionarFornecedor.addEventListener('click', adicionarFornecedor);
+    elementos.fornecedorFechar.addEventListener('click', fecharModalFornecedor);
+    elementos.fornecedorCancelar.addEventListener('click', fecharModalFornecedor);
+    elementos.fornecedorNovo.addEventListener('click', function () {
+      elementos.fornecedorNovo.hidden = true;
+      elementos.fornecedorForm.hidden = false;
+      atualizarCamposPixFornecedor();
+      elementos.fornecedorNome.focus();
+    });
+    elementos.fornecedorLista.addEventListener('click', selecionarFornecedorCadastrado);
+    elementos.fornecedorForma.addEventListener('change', atualizarCamposPixFornecedor);
+    elementos.fornecedorForm.addEventListener('submit', salvarNovoFornecedor);
+    elementos.fornecedorModal.addEventListener('click', function (evento) {
+      if (evento.target === elementos.fornecedorModal) fecharModalFornecedor();
+    });
     elementos.limpar.addEventListener('click', limparTabela);
     elementos.imprimir.addEventListener('click', abrirPrevia);
     elementos.fecharPrevia.addEventListener('click', fecharPrevia);
@@ -615,6 +721,19 @@
       app: porId('cotacoes-app'),
       adicionarProduto: porId('cotacoes-adicionar-item'),
       adicionarFornecedor: porId('cotacoes-adicionar-fornecedor'),
+      fornecedorModal: porId('cotacoes-fornecedor-modal'),
+      fornecedorFechar: porId('cotacoes-fornecedor-fechar'),
+      fornecedorLista: porId('cotacoes-fornecedor-lista'),
+      fornecedorNovo: porId('cotacoes-fornecedor-novo'),
+      fornecedorForm: porId('cotacoes-fornecedor-form'),
+      fornecedorNome: porId('cotacoes-fornecedor-nome'),
+      fornecedorApelido: porId('cotacoes-fornecedor-apelido'),
+      fornecedorForma: porId('cotacoes-fornecedor-forma'),
+      fornecedorCamposPix: porId('cotacoes-fornecedor-campos-pix'),
+      fornecedorTipo: porId('cotacoes-fornecedor-tipo'),
+      fornecedorChave: porId('cotacoes-fornecedor-chave'),
+      fornecedorErro: porId('cotacoes-fornecedor-erro'),
+      fornecedorCancelar: porId('cotacoes-fornecedor-cancelar'),
       limpar: porId('cotacoes-limpar'),
       imprimir: porId('cotacoes-imprimir'),
       status: porId('cotacoes-sheet-status'),

@@ -20,6 +20,7 @@ document.getElementById('btn-sair').addEventListener('click', () => {
 // Estado
 let funcionarios = [];
 let idParaExcluir = null;
+let fornecedores = [];
 
 // Sanitizacao basica para prevenir XSS
 function escapar(str) {
@@ -266,4 +267,108 @@ document.getElementById('chave-form').addEventListener('submit', async (e) => {
 });
 
 // Inicializar
+async function carregarFornecedores() {
+  try {
+    const resp = await fetch('/api/fornecedores-pagamento', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (resp.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = 'login.html';
+      return;
+    }
+    if (!resp.ok) throw new Error('Erro ao carregar fornecedores');
+    fornecedores = (await resp.json()).fornecedores || [];
+    const tbody = document.getElementById('tabela-fornecedores');
+    const vazio = document.getElementById('msg-fornecedores-vazio');
+    tbody.innerHTML = fornecedores.map(f => `
+      <tr>
+        <td>${escapar(f.apelido || f.nome)}</td>
+        <td>${escapar(f.forma_pagamento || 'PIX')}</td>
+        <td>${(f.forma_pagamento || 'PIX') === 'PIX' ? escapar(f.tipo_pix + ' · ' + f.chave_pix) : 'Pagamento por boleto'}</td>
+        <td>
+          <button class="btn-editar" onclick="abrirModalFornecedor('${f.id}')">Editar</button>
+          <button class="btn-excluir" onclick="excluirFornecedor('${f.id}')">Excluir</button>
+        </td>
+      </tr>`).join('');
+    vazio.style.display = fornecedores.length ? 'none' : '';
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function abrirModalFornecedor(id) {
+  const fornecedor = fornecedores.find(f => f.id === id);
+  document.getElementById('fornecedor-edit-id').value = fornecedor ? fornecedor.id : '';
+  document.getElementById('fornecedor-nome').value = fornecedor ? fornecedor.nome : '';
+  document.getElementById('fornecedor-apelido').value = fornecedor ? (fornecedor.apelido || '') : '';
+  document.getElementById('fornecedor-forma').value = fornecedor ? (fornecedor.forma_pagamento || 'PIX') : 'PIX';
+  document.getElementById('fornecedor-tipo').value = fornecedor ? fornecedor.tipo_pix : '';
+  document.getElementById('fornecedor-chave').value = fornecedor ? fornecedor.chave_pix : '';
+  document.getElementById('modal-fornecedor-title').textContent = fornecedor ? 'Editar Fornecedor' : 'Novo Fornecedor';
+  document.getElementById('fornecedor-msg-erro').style.display = 'none';
+  document.getElementById('modal-fornecedor').classList.add('active');
+  atualizarCamposPix();
+}
+
+function fecharModalFornecedor() {
+  document.getElementById('modal-fornecedor').classList.remove('active');
+}
+
+async function excluirFornecedor(id) {
+  const fornecedor = fornecedores.find(f => f.id === id);
+  if (!fornecedor || !window.confirm('Excluir ' + (fornecedor.apelido || fornecedor.nome) + '?')) return;
+  const resp = await fetch('/api/fornecedores-pagamento/' + id, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (resp.ok) carregarFornecedores();
+}
+
+document.getElementById('fornecedor-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const erro = document.getElementById('fornecedor-msg-erro');
+  erro.style.display = 'none';
+  const id = document.getElementById('fornecedor-edit-id').value;
+  const body = {
+    nome: document.getElementById('fornecedor-nome').value.trim(),
+    apelido: document.getElementById('fornecedor-apelido').value.trim(),
+    forma_pagamento: document.getElementById('fornecedor-forma').value,
+    tipo_pix: document.getElementById('fornecedor-forma').value === 'PIX' ? document.getElementById('fornecedor-tipo').value : '',
+    chave_pix: document.getElementById('fornecedor-forma').value === 'PIX' ? document.getElementById('fornecedor-chave').value.trim() : ''
+  };
+  const usaPix = body.forma_pagamento === 'PIX';
+  const erroChave = usaPix ? validarChave(body.tipo_pix, body.chave_pix) : null;
+  if (!body.nome || (usaPix && !body.tipo_pix) || erroChave) {
+    erro.textContent = !body.nome ? 'Nome do fornecedor é obrigatório.' : (!body.tipo_pix ? 'Selecione o tipo da chave.' : erroChave);
+    erro.style.display = '';
+    return;
+  }
+  try {
+    const resp = await fetch('/api/fornecedores-pagamento' + (id ? '/' + id : ''), {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    fecharModalFornecedor();
+    carregarFornecedores();
+  } catch (err) {
+    erro.textContent = err.message;
+    erro.style.display = '';
+  }
+});
+
+function atualizarCamposPix() {
+  const usaPix = document.getElementById('fornecedor-forma').value === 'PIX';
+  document.getElementById('fornecedor-campos-pix').style.display = usaPix ? '' : 'none';
+  document.getElementById('fornecedor-tipo').required = usaPix;
+  document.getElementById('fornecedor-chave').required = usaPix;
+}
+
+document.getElementById('fornecedor-forma').addEventListener('change', atualizarCamposPix);
+
 carregarChaves();
+carregarFornecedores();

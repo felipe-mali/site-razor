@@ -561,7 +561,9 @@ teste('contrato estático mantém planilha compacta, impressão, temas e quatro 
   assert.match(css, /-webkit-print-color-adjust\s*:\s*exact/i);
   assert.doesNotMatch(css, /(?:linear|radial)-gradient\s*\(/i);
 
-  assert.doesNotMatch(frontend, /\/api\/cotacoes|\bfetch\s*\(|localStorage|sessionStorage|autosave/i);
+  // A planilha continua temporária; chamadas ao cadastro compartilhado de
+  // fornecedores e leitura do token de autenticação são permitidas.
+  assert.doesNotMatch(frontend, /\/api\/cotacoes|sessionStorage|autosave/i);
   assert.doesNotMatch(modelo, /\/api\/cotacoes|\bfetch\s*\(|localStorage|sessionStorage|autosave/i);
   assert.doesNotMatch(servidor, /\/api\/cotacoes|cotacoes-service|COTACOES_PATH/);
   assert.equal(fs.existsSync(path.join(RAIZ, 'lib', 'cotacoes-service.js')), false);

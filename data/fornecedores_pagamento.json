@@ -1,0 +1,34 @@
+{
+  "fornecedores": [
+    {
+      "id": "mrxik6h5fayb",
+      "nome": "Marcos Pavão",
+      "apelido": "Pavão",
+      "forma_pagamento": "PIX",
+      "tipo_pix": "CPF",
+      "chave_pix": "07136711819",
+      "created_at": "2026-07-23T12:54:51.593Z",
+      "updated_at": "2026-07-23T12:54:51.593Z"
+    },
+    {
+      "id": "mrxilg3p8he1",
+      "nome": "JBF FERRAMENTARIA E ESTAMPARIA",
+      "apelido": "Juca (hastes)",
+      "forma_pagamento": "PIX",
+      "tipo_pix": "Telefone",
+      "chave_pix": "16988569520",
+      "created_at": "2026-07-23T12:55:50.725Z",
+      "updated_at": "2026-07-23T12:55:50.725Z"
+    },
+    {
+      "id": "mrximzxl0w3g",
+      "nome": "Josimara Cristiana Lavezzo Lucena de Carvalho",
+      "apelido": "Josi (Papelão)",
+      "forma_pagamento": "PIX",
+      "tipo_pix": "Telefone",
+      "chave_pix": "16993299459",
+      "created_at": "2026-07-23T12:57:03.081Z",
+      "updated_at": "2026-07-23T12:57:03.081Z"
+    }
+  ]
+}

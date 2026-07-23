@@ -1,1 +1,218 @@
-{}
+{
+  "felipe": {
+    "producaoM2h": {
+      "5": 16.25,
+      "8": 25,
+      "10": 28.75,
+      "2.5": 8.75
+    },
+    "producao": {
+      "malha": "2.5",
+      "comprimento": "",
+      "altura": "",
+      "quantidade": "",
+      "diasFila": ""
+    },
+    "conversor": {
+      "valor": "",
+      "unidade": "m"
+    },
+    "mureta": {
+      "metros": "",
+      "fiadaBloco": "1",
+      "fiadaCanaleta": "1",
+      "altura": ""
+    },
+    "malha": {
+      "tipo": "",
+      "bwg": "",
+      "metros": "",
+      "altura": "",
+      "bobinas": ""
+    },
+    "versaoTabela": 2,
+    "tabelaPeso": {
+      "malha2_5": {
+        "bwg12": 4,
+        "bwg14": 2.38,
+        "bwg16": 1.4
+      },
+      "malha5": {
+        "bwg12": 2.85,
+        "bwg14": 1.15,
+        "bwg16": 0.8
+      },
+      "malha8": {
+        "bwg12": 1.35,
+        "bwg14": 0.9
+      },
+      "malha10": {
+        "bwg12": 1,
+        "bwg14": 0.65
+      }
+    },
+    "telaAtual": "cotacoes"
+  },
+  "kelvin": {
+    "producaoM2h": {
+      "5": 16.25,
+      "8": 25,
+      "10": 28.75,
+      "2.5": 8.75
+    },
+    "producao": {
+      "malha": "5",
+      "comprimento": "",
+      "altura": "",
+      "quantidade": "",
+      "diasFila": ""
+    },
+    "conversor": {
+      "valor": "",
+      "unidade": "m"
+    },
+    "mureta": {
+      "metros": "",
+      "fiadaBloco": "1",
+      "fiadaCanaleta": "1",
+      "altura": ""
+    },
+    "malha": {
+      "tipo": "",
+      "bwg": "",
+      "metros": "",
+      "altura": "",
+      "bobinas": ""
+    },
+    "versaoTabela": 2,
+    "tabelaPeso": {
+      "malha2_5": {
+        "bwg12": 4,
+        "bwg14": 2.38,
+        "bwg16": 1.4
+      },
+      "malha5": {
+        "bwg12": 2.85,
+        "bwg14": 1.15,
+        "bwg16": 0.8
+      },
+      "malha8": {
+        "bwg12": 1.35,
+        "bwg14": 0.9
+      },
+      "malha10": {
+        "bwg12": 1,
+        "bwg14": 0.65
+      }
+    },
+    "telaAtual": "cotacoes"
+  },
+  "daniela": {
+    "producaoM2h": {
+      "5": 16.25,
+      "8": 25,
+      "10": 28.75,
+      "2.5": 8.75
+    },
+    "producao": {
+      "malha": "5",
+      "comprimento": "",
+      "altura": "",
+      "quantidade": "",
+      "diasFila": ""
+    },
+    "conversor": {
+      "valor": "",
+      "unidade": "m"
+    },
+    "mureta": {
+      "metros": "",
+      "fiadaBloco": "1",
+      "fiadaCanaleta": "1",
+      "altura": ""
+    },
+    "malha": {
+      "tipo": "",
+      "bwg": "",
+      "metros": "",
+      "altura": "",
+      "bobinas": ""
+    },
+    "versaoTabela": 2,
+    "tabelaPeso": {
+      "malha2_5": {
+        "bwg12": 4,
+        "bwg14": 2.38,
+        "bwg16": 1.4
+      },
+      "malha5": {
+        "bwg12": 2.85,
+        "bwg14": 1.15,
+        "bwg16": 0.8
+      },
+      "malha8": {
+        "bwg12": 1.35,
+        "bwg14": 0.9
+      },
+      "malha10": {
+        "bwg12": 1,
+        "bwg14": 0.65
+      }
+    },
+    "telaAtual": "cotacoes"
+  },
+  "andre": {
+    "producaoM2h": {
+      "5": 16.25,
+      "8": 25,
+      "10": 28.75,
+      "2.5": 8.75
+    },
+    "producao": {
+      "malha": "2.5",
+      "comprimento": "",
+      "altura": "",
+      "quantidade": "",
+      "diasFila": ""
+    },
+    "conversor": {
+      "valor": "",
+      "unidade": "m"
+    },
+    "mureta": {
+      "metros": "",
+      "fiadaBloco": "1",
+      "fiadaCanaleta": "1",
+      "altura": ""
+    },
+    "malha": {
+      "tipo": "",
+      "bwg": "",
+      "metros": "",
+      "altura": "",
+      "bobinas": ""
+    },
+    "versaoTabela": 2,
+    "tabelaPeso": {
+      "malha2_5": {
+        "bwg12": 4,
+        "bwg14": 2.38,
+        "bwg16": 1.4
+      },
+      "malha5": {
+        "bwg12": 2.85,
+        "bwg14": 1.15,
+        "bwg16": 0.8
+      },
+      "malha8": {
+        "bwg12": 1.35,
+        "bwg14": 0.9
+      },
+      "malha10": {
+        "bwg12": 1,
+        "bwg14": 0.65
+      }
+    },
+    "telaAtual": "crm"
+  }
+}

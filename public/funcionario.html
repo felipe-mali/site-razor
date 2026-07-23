@@ -10,10 +10,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/funcionario.css">
-  <script src="https://unpkg.com/@dotlottie/player-component@2.7.1/dist/dotlottie-player.mjs" type="module"></script>
   <link rel="stylesheet" href="css/cancelamentos.css">
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/cotacoes.css">
+  <link rel="stylesheet" href="css/admin-polish.css">
 </head>
 <body class="panel-page sidebar-page">
   <header id="navbar">
@@ -352,6 +352,57 @@
           </div>
         </header>
 
+        <div id="cotacoes-fornecedor-modal" class="cotacoes-supplier-modal" hidden>
+          <div class="cotacoes-supplier-dialog" role="dialog" aria-modal="true" aria-labelledby="cotacoes-fornecedor-modal-titulo">
+            <div class="cotacoes-supplier-dialog-header">
+              <div>
+                <p class="cotacoes-eyebrow">Cadastro compartilhado</p>
+                <h3 id="cotacoes-fornecedor-modal-titulo">Adicionar fornecedor</h3>
+              </div>
+              <button id="cotacoes-fornecedor-fechar" type="button" class="cotacoes-supplier-close" aria-label="Fechar">×</button>
+            </div>
+            <div id="cotacoes-fornecedor-lista" class="cotacoes-supplier-list"></div>
+            <button id="cotacoes-fornecedor-novo" type="button" class="cotacoes-btn cotacoes-btn-ghost">+ Adicionar novo</button>
+            <form id="cotacoes-fornecedor-form" class="cotacoes-supplier-form" hidden>
+              <div class="cotacoes-field">
+                <label for="cotacoes-fornecedor-nome">Nome do fornecedor</label>
+                <input id="cotacoes-fornecedor-nome" type="text" maxlength="160" required>
+              </div>
+              <div class="cotacoes-field">
+                <label for="cotacoes-fornecedor-apelido">Nome curto (opcional)</label>
+                <input id="cotacoes-fornecedor-apelido" type="text" maxlength="80">
+              </div>
+              <div class="cotacoes-field">
+                <label for="cotacoes-fornecedor-forma">Forma de pagamento</label>
+                <select id="cotacoes-fornecedor-forma" required>
+                  <option value="PIX">PIX</option>
+                  <option value="Boleto">Boleto</option>
+                </select>
+              </div>
+              <div id="cotacoes-fornecedor-campos-pix">
+                <div class="cotacoes-field">
+                  <label for="cotacoes-fornecedor-tipo">Tipo da chave PIX</label>
+                  <select id="cotacoes-fornecedor-tipo" required>
+                    <option value="">Selecione...</option>
+                    <option value="CPF">CPF</option><option value="CNPJ">CNPJ</option>
+                    <option value="Telefone">Telefone</option><option value="Email">E-mail</option>
+                    <option value="Aleatoria">Chave aleatória</option>
+                  </select>
+                </div>
+                <div class="cotacoes-field">
+                  <label for="cotacoes-fornecedor-chave">Chave PIX</label>
+                  <input id="cotacoes-fornecedor-chave" type="text" maxlength="180" required>
+                </div>
+              </div>
+              <p id="cotacoes-fornecedor-erro" class="cotacoes-supplier-error" role="alert"></p>
+              <div class="cotacoes-supplier-actions">
+                <button type="submit" class="cotacoes-btn cotacoes-btn-primary">Salvar e adicionar</button>
+                <button id="cotacoes-fornecedor-cancelar" type="button" class="cotacoes-btn cotacoes-btn-ghost">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
         <section class="cotacoes-sheet-panel" aria-labelledby="cotacoes-planilha-titulo">
           <h3 id="cotacoes-planilha-titulo" class="sr-only">Planilha comparativa de produtos e fornecedores</h3>
           <div id="cotacoes-sheet-status" class="cotacoes-sheet-status" role="status" aria-live="polite" aria-atomic="true">
@@ -437,7 +488,7 @@
   <script src="js/cotacoes-modelo.js"></script>
   <script src="js/funcionario.js"></script>
   <script src="js/cotacoes-print.js"></script>
-  <script src="js/cotacoes.js"></script>
+  <script src="js/cotacoes.js?v=3"></script>
   <script src="js/cancelamentos.js"></script>
   <script src="js/sidebar.js"></script>
 </body>

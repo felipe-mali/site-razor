@@ -1,4 +1,74 @@
 /* Calculadora temporária de Cotação de Preços — escopo exclusivo do módulo. */
+.cotacoes-supplier-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .72);
+}
+
+.cotacoes-supplier-modal[hidden] { display: none; }
+
+.cotacoes-supplier-dialog {
+  width: min(620px, 100%);
+  max-height: min(760px, 92vh);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 8px;
+  background: #151715;
+  box-shadow: 0 24px 70px rgba(0,0,0,.5);
+}
+
+.cotacoes-supplier-dialog-header,
+.cotacoes-supplier-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cotacoes-supplier-dialog-header { margin-bottom: 18px; }
+.cotacoes-supplier-dialog-header h3 { margin: 2px 0 0; }
+
+.cotacoes-supplier-close {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.cotacoes-supplier-list {
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  margin-bottom: 14px;
+  overflow: auto;
+}
+
+.cotacoes-supplier-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px;
+  background: #202320;
+  color: #f1f2ef;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cotacoes-supplier-option:hover { border-color: #d59b2d; }
+.cotacoes-supplier-option small { color: #a9ada7; }
+.cotacoes-supplier-empty { color: #a9ada7; }
+.cotacoes-supplier-form { display: grid; gap: 12px; margin-top: 18px; }
+.cotacoes-supplier-error { min-height: 18px; margin: 0; color: #ef4444; }
 
 .cotacoes-app,
 .cotacoes-print-modal {
