@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/cancelamentos.css">
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/cotacoes.css">
+  <link rel="stylesheet" href="css/comprovante-entrega.css">
   <link rel="stylesheet" href="css/admin-polish.css">
 </head>
 <body class="panel-page sidebar-page">
@@ -111,6 +112,10 @@
           <button class="sidebar-btn" id="menu-cotacoes" type="button" onclick="trocarTela('cotacoes')" hidden>
             <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18H4z"/><path d="M8 7h8M8 11h3M14 11h2M8 15h3M14 15h2"/></svg>
             <span class="sidebar-label">Cotação de Preços</span>
+          </button>
+          <button class="sidebar-btn" id="menu-comprovante-entrega" type="button" onclick="trocarTela('comprovante-entrega')" hidden>
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l4 4v16H6z"/><path d="M14 2v5h5M9 12h7M9 16h7"/><path d="M3 7v13h3"/></svg>
+            <span class="sidebar-label">Emitir comprovante de entrega</span>
           </button>
         </div>
       </div>
@@ -469,7 +474,199 @@
         <div id="cotacoes-print-document" class="cotacoes-print-document" aria-live="polite"></div>
       </div>
     </section>
-    <!-- TELA 9 - DASHBOARD -->
+    <!-- TELA 9 - COMPROVANTE DE ENTREGA -->
+    <section id="tela-comprovante-entrega" class="tela" aria-labelledby="ce-titulo">
+      <div id="ce-acesso-negado" class="ce-access-denied" hidden></div>
+      <div id="ce-app" class="ce-app" hidden>
+        <header class="ce-page-header">
+          <div>
+            <p class="ce-eyebrow">Logística</p>
+            <h2 id="ce-titulo">Emitir comprovante de entrega</h2>
+            <p>Preencha os dados da entrega e gere um documento A4 pronto para assinatura.</p>
+          </div>
+          <span class="ce-privacy-badge" title="Os dados não são salvos no navegador nem enviados ao servidor">
+            Dados temporários
+          </span>
+        </header>
+
+        <div id="ce-status" class="ce-status" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+
+        <form id="ce-form" class="ce-form" autocomplete="off" novalidate>
+          <fieldset class="ce-section">
+            <legend><span>1</span> Dados da venda</legend>
+            <p class="ce-section-help">Os números da venda, do pedido interno e da NF-e são independentes.</p>
+            <div class="ce-grid ce-grid-3">
+              <div class="ce-field">
+                <label for="ce-venda-marketplace">Venda Mercado Livre ou marketplace</label>
+                <input id="ce-venda-marketplace" data-name="vendaMarketplace" type="text" maxlength="80" inputmode="numeric" placeholder="Número da venda">
+              </div>
+              <div class="ce-field">
+                <label for="ce-pedido-interno">Pedido interno</label>
+                <input id="ce-pedido-interno" data-name="pedidoInterno" type="text" maxlength="80" inputmode="numeric" placeholder="Número do pedido">
+              </div>
+              <div class="ce-field">
+                <label for="ce-nfe-numero">NF-e</label>
+                <input id="ce-nfe-numero" data-name="nfeNumero" type="text" maxlength="20" inputmode="numeric" placeholder="Número da NF-e">
+              </div>
+              <div class="ce-field">
+                <label for="ce-nfe-serie">Série da NF-e</label>
+                <input id="ce-nfe-serie" data-name="nfeSerie" type="text" maxlength="10" inputmode="numeric" placeholder="Série">
+              </div>
+              <div class="ce-field ce-field-span-2">
+                <label for="ce-nfe-chave">Chave de acesso da NF-e</label>
+                <input id="ce-nfe-chave" data-name="nfeChave" type="text" maxlength="54" inputmode="numeric" placeholder="44 dígitos">
+              </div>
+              <div class="ce-field">
+                <label for="ce-data-entrega">Data da entrega <span aria-hidden="true">*</span></label>
+                <input id="ce-data-entrega" data-name="dataEntrega" type="date" required>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="ce-section">
+            <legend><span>2</span> Destinatário</legend>
+            <div class="ce-grid ce-grid-3">
+              <div class="ce-field ce-field-span-2">
+                <label for="ce-destinatario">Razão social ou nome <span aria-hidden="true">*</span></label>
+                <input id="ce-destinatario" data-name="destinatario" type="text" maxlength="180" required placeholder="Nome do destinatário">
+              </div>
+              <div class="ce-field">
+                <label for="ce-documento">CNPJ ou CPF</label>
+                <input id="ce-documento" data-name="documento" type="text" maxlength="18" inputmode="numeric" placeholder="CPF ou CNPJ">
+              </div>
+              <div class="ce-field">
+                <label for="ce-inscricao-estadual">Inscrição Estadual <span class="ce-optional">opcional</span></label>
+                <input id="ce-inscricao-estadual" data-name="inscricaoEstadual" type="text" maxlength="30" placeholder="Inscrição Estadual">
+              </div>
+              <div class="ce-field ce-field-span-2">
+                <label for="ce-contato">Nome do contato</label>
+                <input id="ce-contato" data-name="contato" type="text" maxlength="120" placeholder="Pessoa responsável pelo recebimento">
+              </div>
+              <div class="ce-field ce-field-span-2">
+                <label for="ce-endereco">Endereço da entrega <span aria-hidden="true">*</span></label>
+                <input id="ce-endereco" data-name="endereco" type="text" maxlength="180" required placeholder="Rua, avenida ou rodovia">
+              </div>
+              <div class="ce-field">
+                <label for="ce-numero">Número</label>
+                <input id="ce-numero" data-name="numero" type="text" maxlength="20" placeholder="Número ou s/n">
+              </div>
+              <div class="ce-field">
+                <label for="ce-bairro">Bairro</label>
+                <input id="ce-bairro" data-name="bairro" type="text" maxlength="100" placeholder="Bairro">
+              </div>
+              <div class="ce-field">
+                <label for="ce-cidade">Cidade</label>
+                <input id="ce-cidade" data-name="cidade" type="text" maxlength="100" placeholder="Cidade">
+              </div>
+              <div class="ce-field ce-field-compact">
+                <label for="ce-estado">Estado</label>
+                <input id="ce-estado" data-name="estado" type="text" maxlength="2" autocapitalize="characters" placeholder="UF">
+              </div>
+              <div class="ce-field">
+                <label for="ce-cep">CEP</label>
+                <input id="ce-cep" data-name="cep" type="text" maxlength="9" inputmode="numeric" placeholder="00000-000">
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="ce-section ce-products-section">
+            <legend><span>3</span> Mercadorias</legend>
+            <div class="ce-section-toolbar">
+              <p class="ce-section-help">O valor total de cada item é calculado pela quantidade × valor unitário.</p>
+              <button id="ce-adicionar-item" class="ce-btn ce-btn-secondary" type="button">+ Adicionar mercadoria</button>
+            </div>
+            <div class="ce-items-header" aria-hidden="true">
+              <span>Código</span>
+              <span>Descrição *</span>
+              <span>Un.</span>
+              <span>Quantidade *</span>
+              <span>Valor unitário</span>
+              <span>Total</span>
+              <span></span>
+            </div>
+            <div id="ce-itens" class="ce-items"></div>
+
+            <div class="ce-financial-grid">
+              <div class="ce-field ce-freight-field">
+                <label for="ce-frete">Valor do frete</label>
+                <input id="ce-frete" data-name="frete" type="text" inputmode="decimal" placeholder="R$ 0,00">
+              </div>
+              <dl class="ce-totals" aria-live="polite" aria-atomic="true">
+                <div><dt>Total dos produtos</dt><dd id="ce-total-produtos">R$ 0,00</dd></div>
+                <div><dt>Frete</dt><dd id="ce-total-frete">R$ 0,00</dd></div>
+                <div class="ce-total-main"><dt>Valor total geral</dt><dd id="ce-total-geral">R$ 0,00</dd></div>
+              </dl>
+            </div>
+          </fieldset>
+
+          <fieldset class="ce-section">
+            <legend><span>4</span> Forma de entrega</legend>
+            <div class="ce-grid ce-grid-2">
+              <div class="ce-field">
+                <label for="ce-forma-entrega">Modalidade</label>
+                <select id="ce-forma-entrega" data-name="formaEntrega">
+                  <option value="terceirizado" selected>Transporte terceirizado</option>
+                  <option value="proprio">Veículo próprio da Razor</option>
+                  <option value="outra">Outra forma de entrega</option>
+                </select>
+              </div>
+              <div id="ce-outra-forma-wrapper" class="ce-field" hidden>
+                <label for="ce-outra-forma">Descrição da outra forma <span aria-hidden="true">*</span></label>
+                <input id="ce-outra-forma" data-name="outraForma" type="text" maxlength="220" placeholder="Descreva como a entrega foi realizada">
+              </div>
+            </div>
+            <p class="ce-delivery-note">Placa, motorista e transportadora poderão ser informados manualmente no recibo durante a entrega.</p>
+          </fieldset>
+
+          <fieldset class="ce-section ce-issuer-section">
+            <legend><span>5</span> Empresa emitente</legend>
+            <div id="ce-emitente-resumo" class="ce-issuer-summary"></div>
+          </fieldset>
+
+          <div class="ce-actions" aria-label="Ações do comprovante">
+            <button id="ce-gerar-pdf" class="ce-btn ce-btn-primary ce-btn-featured" type="button">
+              <span class="ce-btn-label">Gerar PDF</span>
+            </button>
+            <button id="ce-visualizar-pdf" class="ce-btn ce-btn-secondary" type="button">Visualizar PDF</button>
+            <button id="ce-baixar-pdf" class="ce-btn ce-btn-secondary" type="button">Gerar e baixar PDF</button>
+            <button id="ce-limpar" class="ce-btn ce-btn-ghost" type="button">Limpar formulário</button>
+          </div>
+          <p class="ce-privacy-note">As informações permanecem somente neste formulário durante o preenchimento e não são salvas.</p>
+        </form>
+
+        <template id="ce-item-template">
+          <article class="ce-item">
+            <div class="ce-item-index" aria-hidden="true"></div>
+            <div class="ce-item-field">
+              <label>Código</label>
+              <input data-item-field="codigo" type="text" maxlength="60" placeholder="Código">
+            </div>
+            <div class="ce-item-field ce-item-description">
+              <label>Descrição <span aria-hidden="true">*</span></label>
+              <input data-item-field="descricao" type="text" maxlength="500" required placeholder="Descrição da mercadoria">
+            </div>
+            <div class="ce-item-field">
+              <label>Unidade</label>
+              <input data-item-field="unidade" type="text" maxlength="12" placeholder="UN">
+            </div>
+            <div class="ce-item-field">
+              <label>Quantidade <span aria-hidden="true">*</span></label>
+              <input data-item-field="quantidade" type="text" inputmode="decimal" required placeholder="0">
+            </div>
+            <div class="ce-item-field">
+              <label>Valor unitário</label>
+              <input data-item-field="valorUnitario" type="text" inputmode="decimal" placeholder="R$ 0,00">
+            </div>
+            <div class="ce-item-total-wrap">
+              <span>Total</span>
+              <output data-item-total>R$ 0,00</output>
+            </div>
+            <button class="ce-remove-item" data-action="remover-item" type="button" aria-label="Remover mercadoria">×</button>
+          </article>
+        </template>
+      </div>
+    </section>
+    <!-- TELA 10 - DASHBOARD -->
     <section id="tela-dashboard" class="tela">
       <div class="tela-titulo"><h2>Dashboard</h2><p class="subtitulo">Relatorios e indicadores conectados ao Power BI.</p></div>
       <div class="card" style="width:100%;height:calc(100vh - 200px);padding:0;overflow:hidden;">
@@ -486,6 +683,10 @@
   <script src="js/app.js"></script>
   <script src="js/cotacoes-financeiro.js"></script>
   <script src="js/cotacoes-modelo.js"></script>
+  <script src="js/comprovante-entrega-config.js"></script>
+  <script src="js/comprovante-entrega-modelo.js"></script>
+  <script src="js/comprovante-entrega-pdf.js"></script>
+  <script src="js/comprovante-entrega.js"></script>
   <script src="js/funcionario.js"></script>
   <script src="js/cotacoes-print.js"></script>
   <script src="js/cotacoes.js?v=3"></script>

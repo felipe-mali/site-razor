@@ -30,9 +30,19 @@ function podeAcessarModuloCotacoes(usuario) {
   return Boolean(window.CotacoesModelo && window.CotacoesModelo.podeAcessar(usuario));
 }
 
+function podeAcessarModuloComprovanteEntrega(usuario) {
+  // O comprovante integra a mesma área e reutiliza a permissão já existente
+  // da Logística, sem criar campos novos no cadastro de usuários.
+  return podeAcessarModuloCotacoes(usuario);
+}
+
 window.podeAcessarModuloCotacoes = podeAcessarModuloCotacoes;
 window.usuarioAtualPodeAcessarCotacoes = function () {
   return podeAcessarModuloCotacoes(user);
+};
+window.podeAcessarModuloComprovanteEntrega = podeAcessarModuloComprovanteEntrega;
+window.usuarioAtualPodeEmitirComprovanteEntrega = function () {
+  return podeAcessarModuloComprovanteEntrega(user);
 };
 
 function aplicarPermissoesSidebar() {
@@ -41,10 +51,15 @@ function aplicarPermissoesSidebar() {
 
   // Menu e tela usam a mesma regra central de acesso da calculadora local.
   var menuCotacoes = document.getElementById('menu-cotacoes');
+  var menuComprovante = document.getElementById('menu-comprovante-entrega');
   var podeAcessarCotacoes = podeAcessarModuloCotacoes(user);
   if (menuCotacoes) {
     menuCotacoes.hidden = !podeAcessarCotacoes;
     menuCotacoes.style.display = podeAcessarCotacoes ? '' : 'none';
+  }
+  if (menuComprovante) {
+    menuComprovante.hidden = !podeAcessarModuloComprovanteEntrega(user);
+    menuComprovante.style.display = podeAcessarModuloComprovanteEntrega(user) ? '' : 'none';
   }
 
   for (var i = 0; i < grupos.length; i++) {
@@ -76,10 +91,11 @@ function aplicarPermissoesSidebar() {
 
   var telaAtual = localStorage.getItem('calc-tela-atual');
   var telasVendedor = ['crm','cancelamentos','fotos','dashboard','producao','conversor','mureta','malha'];
-  var telasLogistica = ['fotos','cotacoes','producao','conversor','mureta','malha'];
+  var telasLogistica = ['fotos','cotacoes','comprovante-entrega','producao','conversor','mureta','malha'];
 
   if (cargo === 'vendedor' && telasVendedor.indexOf(telaAtual) === -1 &&
-      !(telaAtual === 'cotacoes' && podeAcessarCotacoes)) {
+      !(telaAtual === 'cotacoes' && podeAcessarCotacoes) &&
+      !(telaAtual === 'comprovante-entrega' && podeAcessarModuloComprovanteEntrega(user))) {
     trocarTela('crm');
   }
   if (cargo === 'logistica' && telasLogistica.indexOf(telaAtual) === -1) {
@@ -139,6 +155,13 @@ function trocarTela(tela) {
   document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
   document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('ativo'));
   document.querySelectorAll('.btn-menu').forEach(b => b.classList.remove('ativo'));
+  const textoRodape = document.querySelector('.rodape span');
+  if (textoRodape) {
+    if (!textoRodape.dataset.textoPadrao) textoRodape.dataset.textoPadrao = textoRodape.textContent;
+    textoRodape.textContent = tela === 'comprovante-entrega'
+      ? 'Calculadoras Industriais - Razor Industrial | Os dados deste comprovante não são salvos.'
+      : textoRodape.dataset.textoPadrao;
+  }
 
   if (tela === 'cotacoes' && !podeAcessarModuloCotacoes(user)) {
     const telaCotacoes = document.getElementById('tela-cotacoes');
@@ -160,6 +183,26 @@ function trocarTela(tela) {
     return false;
   }
 
+  if (tela === 'comprovante-entrega' && !podeAcessarModuloComprovanteEntrega(user)) {
+    const telaComprovante = document.getElementById('tela-comprovante-entrega');
+    const appComprovante = document.getElementById('ce-app');
+    const acessoNegado = document.getElementById('ce-acesso-negado');
+
+    telaComprovante?.classList.add('ativa');
+    if (appComprovante) appComprovante.hidden = true;
+    if (acessoNegado) {
+      acessoNegado.hidden = false;
+      acessoNegado.innerHTML = `
+        <div class="ce-access-card" role="alert">
+          <div class="ce-access-icon" aria-hidden="true">!</div>
+          <p class="ce-eyebrow">Permissão necessária</p>
+          <h2>ACESSO NEGADO</h2>
+          <p>Você não possui permissão para emitir comprovantes no módulo de Logística.</p>
+        </div>`;
+    }
+    return false;
+  }
+
   const mapa = {
     producao:  'tela-producao',
     conversor: 'tela-conversor',
@@ -169,6 +212,7 @@ function trocarTela(tela) {
     crm:       'tela-crm',
     cancelamentos: 'tela-cancelamentos',
     cotacoes:   'tela-cotacoes',
+    'comprovante-entrega': 'tela-comprovante-entrega',
     dashboard: 'tela-dashboard'
   };
 
@@ -183,6 +227,15 @@ function trocarTela(tela) {
       if (acessoNegado) acessoNegado.hidden = true;
       if (window.CotacoesApp && typeof window.CotacoesApp.abrir === 'function') {
         window.CotacoesApp.abrir();
+      }
+    }
+    if (tela === 'comprovante-entrega') {
+      const appComprovante = document.getElementById('ce-app');
+      const acessoNegado = document.getElementById('ce-acesso-negado');
+      if (appComprovante) appComprovante.hidden = false;
+      if (acessoNegado) acessoNegado.hidden = true;
+      if (window.ComprovanteEntregaApp && typeof window.ComprovanteEntregaApp.abrir === 'function') {
+        window.ComprovanteEntregaApp.abrir();
       }
     }
   }

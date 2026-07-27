@@ -19,6 +19,12 @@ app.use(cors());
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.get('/vendor/pdfmake/pdfmake.min.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'node_modules', 'pdfmake', 'build', 'pdfmake.min.js'));
+});
+app.get('/vendor/pdfmake/vfs_fonts.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'node_modules', 'pdfmake', 'build', 'vfs_fonts.js'));
+});
 app.get('/', (req, res) => res.redirect('/login.html'));
 app.get('/site-clientes', (req, res) => {
   res.redirect(process.env.CLIENTES_URL || '/');
