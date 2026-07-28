@@ -5,9 +5,16 @@
   // Only run on public site
   if (!document.body.classList.contains('public-site')) return;
 
+  // A página continua funcional mesmo se o CDN de animações estiver indisponível.
+  if (typeof window.gsap === 'undefined' || typeof window.ScrollTrigger === 'undefined') {
+    return;
+  }
+
   // Respect reduced motion
   var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  var gsap = window.gsap;
+  var ScrollTrigger = window.ScrollTrigger;
   gsap.registerPlugin(ScrollTrigger);
 
   if (prefersReduced) {

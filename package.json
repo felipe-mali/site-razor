@@ -1,0 +1,19 @@
+{
+  "name": "razor-plataforma",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gateway e ferramentas de implantação da plataforma Razor",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node gateway.js",
+    "install:apps": "node scripts/install-subapps.js",
+    "install:apps:production": "node scripts/install-subapps.js --production",
+    "verify": "node scripts/verify-portability.js",
+    "test": "node scripts/run-tests.js",
+    "smoke": "node scripts/smoke-deployment.js",
+    "smoke:crm": "node scripts/smoke-deployment.js --crm",
+    "bundle": "node scripts/package-deploy.js"
+  }
+}

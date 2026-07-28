@@ -3,20 +3,23 @@
 
   var config;
   var modelo;
+  var dadosBrasileiros;
   var pdfMake;
 
   if (typeof module === 'object' && module.exports) {
     config = require('./comprovante-entrega-config');
     modelo = require('./comprovante-entrega-modelo');
+    dadosBrasileiros = require('./dados-brasileiros');
     pdfMake = require('pdfmake/build/pdfmake');
     pdfMake.addVirtualFileSystem(require('pdfmake/build/vfs_fonts'));
   } else {
     config = root && root.ComprovanteEntregaConfig;
     modelo = root && root.ComprovanteEntregaModelo;
+    dadosBrasileiros = root && root.DadosBrasileiros;
     pdfMake = root && root.pdfMake;
   }
 
-  var api = factory(config, modelo, function obterPdfMake() {
+  var api = factory(config, modelo, dadosBrasileiros, function obterPdfMake() {
     return pdfMake || (root && root.pdfMake);
   });
 
@@ -25,12 +28,13 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function criarComprovanteEntregaPdf(
   Config,
   Modelo,
+  DadosBrasileiros,
   obterPdfMake
 ) {
   'use strict';
 
-  if (!Config || !Modelo) {
-    throw new Error('Configuração e modelo do comprovante são obrigatórios.');
+  if (!Config || !Modelo || !DadosBrasileiros) {
+    throw new Error('Configuração, modelo e utilitário de dados do comprovante são obrigatórios.');
   }
 
   var CORES = Object.freeze({
@@ -151,6 +155,50 @@
 
   function cabecalho(logoDataUrl) {
     var empresa = Config.EMPRESA;
+    var cnpj = DadosBrasileiros.formatarCnpj(empresa.cnpj);
+    var telefone = DadosBrasileiros.formatarTelefone(empresa.telefone);
+    var informacoesEmpresa = [{
+      text: texto(empresa.razaoSocial),
+      bold: true,
+      color: CORES.branco,
+      fontSize: 9,
+      margin: [0, 1, 0, 4]
+    }];
+    if (cnpj) {
+      informacoesEmpresa.push({
+        text: 'CNPJ ' + cnpj,
+        color: CORES.branco,
+        fontSize: 6.8,
+        margin: [0, 0, 0, 2]
+      });
+    }
+    if (texto(empresa.endereco)) {
+      informacoesEmpresa.push({
+        text: texto(empresa.endereco),
+        color: CORES.branco,
+        fontSize: 6.8,
+        margin: [0, 0, 0, 2]
+      });
+    }
+    var cidadeCep = juntar([
+      empresa.cidade,
+      texto(empresa.cep) ? 'CEP ' + texto(empresa.cep) : ''
+    ], ' • ');
+    if (cidadeCep) {
+      informacoesEmpresa.push({
+        text: cidadeCep,
+        color: CORES.branco,
+        fontSize: 6.8,
+        margin: [0, 0, 0, 2]
+      });
+    }
+    if (telefone) {
+      informacoesEmpresa.push({
+        text: 'Telefone ' + telefone,
+        color: CORES.branco,
+        fontSize: 6.8
+      });
+    }
     var logo = texto(logoDataUrl)
       ? {
           image: logoDataUrl,
@@ -177,24 +225,7 @@
             body: [[
               { stack: [logo], border: [false, false, false, false] },
               {
-                stack: [
-                  {
-                    text: empresa.razaoSocial,
-                    bold: true,
-                    color: CORES.branco,
-                    fontSize: 9,
-                    margin: [0, 1, 0, 4]
-                  },
-                  { text: 'CNPJ ' + empresa.cnpj, color: CORES.branco, fontSize: 6.8, margin: [0, 0, 0, 2] },
-                  { text: empresa.endereco, color: CORES.branco, fontSize: 6.8, margin: [0, 0, 0, 2] },
-                  {
-                    text: juntar([empresa.cidade, 'CEP ' + empresa.cep], ' • '),
-                    color: CORES.branco,
-                    fontSize: 6.8,
-                    margin: [0, 0, 0, 2]
-                  },
-                  { text: 'Telefone ' + empresa.telefone, color: CORES.branco, fontSize: 6.8 }
-                ],
+                stack: informacoesEmpresa,
                 alignment: 'right',
                 margin: [0, 7, 2, 0],
                 border: [false, false, false, false]

@@ -1,0 +1,13 @@
+.git
+.gitignore
+.agents
+.codex
+.mimocode
+dist
+**/node_modules
+**/.env
+**/*.log
+**/*.bak
+**/*.tmp
+funcionarios/_backup_reorganizacao
+funcionarios/legacy-funcionario

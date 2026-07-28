@@ -25,7 +25,7 @@ function dadosValidos(alteracoes) {
     dataEntrega: '2026-07-27',
     destinatario: {
       nome: 'Empresa Exemplo de Ferramentas Ltda.',
-      documento: '12345678000190',
+      documento: '11222333000181',
       inscricaoEstadual: '',
       contato: 'Pessoa Responsável',
       endereco: 'Rua das Flores',
@@ -193,6 +193,18 @@ teste('validação exige somente os campos obrigatórios e descreve cada erro', 
   }));
   assert.equal(valido.valido, true);
   assert.deepEqual(valido.erros, []);
+
+  const documentoInvalido = Modelo.validar(dadosValidos({
+    destinatario: Object.assign({}, dadosValidos().destinatario, {
+      documento: '123.456.789-01'
+    })
+  }));
+  assert.equal(documentoInvalido.valido, false);
+  assert.match(
+    documentoInvalido.errosPorCampo['destinatario.documento'],
+    /CPF ou CNPJ válido/i
+  );
+  assert.equal(documentoInvalido.dados.destinatario.documento, '');
 });
 
 teste('validação rejeita valores monetários inválidos e estouros numéricos', () => {
@@ -270,9 +282,11 @@ teste('nome do arquivo prioriza NF-e, pedido e venda, sanitiza e tolera ausênci
   assert.doesNotMatch(Modelo.gerarNomeArquivo(dadosValidos()), /[\\/:*?"<>|]/);
 });
 
-teste('máscaras aceitam digitação parcial e limitam o tamanho esperado', () => {
-  assert.equal(Modelo.mascararCpfCnpj('12345678901'), '123.456.789-01');
-  assert.equal(Modelo.mascararCpfCnpj('12345678000190'), '12.345.678/0001-90');
+teste('máscaras aceitam digitação sem criar pontuação para documentos inválidos', () => {
+  assert.equal(Modelo.mascararCpfCnpj('52998224725'), '529.982.247-25');
+  assert.equal(Modelo.mascararCpfCnpj('11222333000181'), '11.222.333/0001-81');
+  assert.equal(Modelo.mascararCpfCnpj('52998'), '52998');
+  assert.equal(Modelo.mascararCpfCnpj('12345678901'), '12345678901');
   assert.equal(Modelo.mascararCep('14075610'), '14075-610');
   assert.equal(
     Modelo.mascararChaveAcesso('12345678901234567890123456789012345678901234'),
@@ -389,11 +403,13 @@ teste('integração estática contém menu, ações, biblioteca local e nenhum a
 
 teste('arquivos funcionam no navegador via window e não persistem nem enviam dados', () => {
   const raiz = path.join(__dirname, 'public', 'js');
+  const dadosFonte = fs.readFileSync(path.join(raiz, 'dados-brasileiros.js'), 'utf8');
   const configFonte = fs.readFileSync(path.join(raiz, 'comprovante-entrega-config.js'), 'utf8');
   const modeloFonte = fs.readFileSync(path.join(raiz, 'comprovante-entrega-modelo.js'), 'utf8');
   const contexto = { window: {} };
   contexto.globalThis = contexto.window;
   vm.createContext(contexto);
+  vm.runInContext(dadosFonte, contexto);
   vm.runInContext(configFonte, contexto);
   vm.runInContext(modeloFonte, contexto);
 

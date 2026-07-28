@@ -1263,17 +1263,95 @@ async function fotosCriarPastaUI() {
 }
 
 /* ========================================
-   TELA 6 — CRM (IndexedDB)
+   TELA 6 — CRM (servidor + migracao legada)
    ======================================== */
 
 const CRM_DB_NAME = 'razor-crm';
 const CRM_DB_VERSION = 1;
 const CRM_STORE = 'clientes';
+const DadosBrasileirosCRM = window.DadosBrasileiros;
 let crmFiltroVendedor = '';
 let crmBusca = '';
+let crmMigracaoLegadoVerificada = false;
 
-function abrirDBCRM() {
+function crmEscaparHTML(valor) {
+  return String(valor ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function crmDataIsoValida(valor) {
+  if (typeof valor !== 'string' || !valor.trim()) return '';
+  const data = new Date(valor);
+  return Number.isNaN(data.getTime()) ? '' : data.toISOString();
+}
+
+function crmTelefoneExibicao(valor, vazio) {
+  return DadosBrasileirosCRM.formatarTelefone(valor) || (vazio || '—');
+}
+
+function crmTelefoneFormulario(valor) {
+  const analise = DadosBrasileirosCRM.analisarTelefone(valor);
+  return {
+    telefone: analise.valido
+      ? analise.formatado
+      : DadosBrasileirosCRM.mascararTelefoneEntrada(valor),
+    ramal: analise.ramal || ''
+  };
+}
+
+function crmTelefoneNormalizado(telefone, ramal) {
+  const base = DadosBrasileirosCRM.textoSeguro(telefone);
+  const extensao = DadosBrasileirosCRM.somenteNumeros(ramal, 10);
+  if (!base) return '';
+  const completo = base + (extensao ? ' ramal ' + extensao : '');
+  return DadosBrasileirosCRM.normalizarTelefone(completo);
+}
+
+function crmCabecalhosApi(comJson) {
+  const headers = { 'Authorization': 'Bearer ' + token };
+  if (comJson) headers['Content-Type'] = 'application/json';
+  return headers;
+}
+
+async function crmRequisicaoApi(caminho, opcoes) {
+  const configuracao = opcoes || {};
+  const resposta = await fetch(caminho, {
+    ...configuracao,
+    headers: {
+      ...crmCabecalhosApi(Object.prototype.hasOwnProperty.call(configuracao, 'body')),
+      ...(configuracao.headers || {})
+    }
+  });
+
+  let dados = null;
+  try {
+    dados = await resposta.json();
+  } catch (e) {
+    dados = null;
+  }
+
+  if (!resposta.ok) {
+    if (resposta.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = 'login.html';
+    }
+    throw new Error((dados && dados.error) || ('Erro HTTP ' + resposta.status));
+  }
+
+  return dados;
+}
+
+function abrirDBCRMLegado() {
   return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      resolve(null);
+      return;
+    }
     const req = indexedDB.open(CRM_DB_NAME, CRM_DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
@@ -1287,43 +1365,273 @@ function abrirDBCRM() {
   });
 }
 
-async function crmCarregarClientes() {
-  const db = await abrirDBCRM();
+async function crmCarregarClientesLegados() {
+  const db = await abrirDBCRMLegado();
+  if (!db || !db.objectStoreNames.contains(CRM_STORE)) {
+    if (db) db.close();
+    return [];
+  }
   return new Promise((resolve, reject) => {
     const tx = db.transaction(CRM_STORE, 'readonly');
     const store = tx.objectStore(CRM_STORE);
     const req = store.getAll();
-    req.onsuccess = () => resolve(req.result);
+    let clientes = [];
+    req.onsuccess = () => {
+      clientes = Array.isArray(req.result) ? req.result : [];
+    };
     req.onerror = () => reject(req.error);
+    tx.oncomplete = () => {
+      db.close();
+      resolve(clientes);
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
   });
 }
 
-async function crmSalvarCliente(cliente) {
-  const db = await abrirDBCRM();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(CRM_STORE, 'readwrite');
-    const store = tx.objectStore(CRM_STORE);
-    const req = store.put(cliente);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
+async function crmCarregarClientes() {
+  const dados = await crmRequisicaoApi('/api/crm');
+  return Array.isArray(dados) ? dados : [];
+}
+
+async function crmSalvarCliente(cliente, idExistente) {
+  const id = DadosBrasileirosCRM.textoSeguro(idExistente);
+  const corpo = {
+    nome: DadosBrasileirosCRM.textoSeguro(cliente && cliente.nome),
+    empresa: DadosBrasileirosCRM.textoSeguro(cliente && cliente.empresa),
+    telefone: DadosBrasileirosCRM.textoSeguro(cliente && cliente.telefone),
+    email: DadosBrasileirosCRM.textoSeguro(cliente && cliente.email),
+    vendedor: DadosBrasileirosCRM.textoSeguro(cliente && cliente.vendedor),
+    observacoes: DadosBrasileirosCRM.textoSeguro(cliente && cliente.observacoes)
+  };
+  if (!id) {
+    const legacyId = DadosBrasileirosCRM.textoSeguro(cliente && cliente.legacyId);
+    const dataCriacao = crmDataIsoValida(cliente && cliente.dataCriacao);
+    const dataAtualizacao = crmDataIsoValida(cliente && cliente.dataAtualizacao);
+    if (legacyId) corpo.legacyId = legacyId;
+    if (dataCriacao) corpo.dataCriacao = dataCriacao;
+    if (dataAtualizacao) corpo.dataAtualizacao = dataAtualizacao;
+  }
+  return crmRequisicaoApi('/api/crm' + (id ? '/' + encodeURIComponent(id) : ''), {
+    method: id ? 'PUT' : 'POST',
+    body: JSON.stringify(corpo)
   });
 }
 
 async function crmExcluirCliente(id) {
-  const db = await abrirDBCRM();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(CRM_STORE, 'readwrite');
-    const store = tx.objectStore(CRM_STORE);
-    const req = store.delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
+  return crmRequisicaoApi('/api/crm/' + encodeURIComponent(id), {
+    method: 'DELETE'
   });
 }
 
+function crmTextoComparavel(valor) {
+  return DadosBrasileirosCRM.textoSeguro(valor)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function crmChaveDeduplicacao(cliente) {
+  const identidade = DadosBrasileirosCRM.textoSeguro(
+    cliente && (cliente.legacyId || cliente.id)
+  );
+  if (identidade) return 'id|' + crmTextoComparavel(identidade);
+  return crmChaveCampos(cliente);
+}
+
+function crmChaveCampos(cliente) {
+  return [
+    'campos',
+    crmTextoComparavel(cliente && cliente.nome),
+    crmTextoComparavel(cliente && cliente.empresa),
+    DadosBrasileirosCRM.normalizarTelefone(cliente && cliente.telefone),
+    crmTextoComparavel(cliente && cliente.email)
+  ].join('|');
+}
+
+function crmPrepararClienteImportacao(cliente, opcoes) {
+  if (!cliente || typeof cliente !== 'object' || Array.isArray(cliente)) {
+    return { erro: 'registro invalido' };
+  }
+
+  const nome = DadosBrasileirosCRM.textoSeguro(cliente.nome);
+  if (!nome) return { erro: 'nome ausente' };
+
+  const telefoneOriginal = DadosBrasileirosCRM.textoSeguro(cliente.telefone);
+  let telefone = telefoneOriginal
+    ? DadosBrasileirosCRM.normalizarTelefone(telefoneOriginal)
+    : '';
+  let observacoes = DadosBrasileirosCRM.textoSeguro(cliente.observacoes);
+  let ajustado = false;
+  if (telefoneOriginal && !telefone) {
+    if (!(opcoes && opcoes.preservarTelefoneInvalido)) {
+      return { erro: 'telefone invalido' };
+    }
+    const notaLegada = 'Telefone legado não validado: ' + telefoneOriginal;
+    observacoes = observacoes ? observacoes + '\n' + notaLegada : notaLegada;
+    telefone = '';
+    ajustado = true;
+  }
+
+  return {
+    cliente: {
+      nome,
+      empresa: DadosBrasileirosCRM.textoSeguro(cliente.empresa),
+      telefone,
+      email: DadosBrasileirosCRM.textoSeguro(cliente.email),
+      vendedor: DadosBrasileirosCRM.textoSeguro(cliente.vendedor),
+      observacoes,
+      legacyId: DadosBrasileirosCRM.textoSeguro(cliente.legacyId || cliente.id),
+      dataCriacao: crmDataIsoValida(cliente.dataCriacao),
+      dataAtualizacao: crmDataIsoValida(cliente.dataAtualizacao)
+    },
+    ajustado
+  };
+}
+
+function crmPlanejarImportacao(lista, existentes, opcoes) {
+  const identidadesExistentes = new Set();
+  const camposExistentes = new Set();
+  (existentes || []).forEach(cliente => {
+    const identidade = DadosBrasileirosCRM.textoSeguro(
+      cliente && (cliente.legacyId || cliente.id)
+    );
+    if (identidade) identidadesExistentes.add(crmTextoComparavel(identidade));
+    camposExistentes.add(crmChaveCampos(cliente));
+  });
+  const identidadesCandidatas = new Set();
+  const camposCandidatosSemId = new Set();
+  const candidatos = [];
+  let duplicados = 0;
+  let invalidos = 0;
+  let ajustados = 0;
+
+  (lista || []).forEach((registro) => {
+    const preparado = crmPrepararClienteImportacao(registro, opcoes);
+    if (!preparado.cliente) {
+      invalidos++;
+      return;
+    }
+    const identidade = DadosBrasileirosCRM.textoSeguro(preparado.cliente.legacyId);
+    const identidadeComparavel = crmTextoComparavel(identidade);
+    const chaveCampos = crmChaveCampos(preparado.cliente);
+    const duplicado = identidade
+      ? (
+        identidadesExistentes.has(identidadeComparavel) ||
+        identidadesCandidatas.has(identidadeComparavel) ||
+        camposExistentes.has(chaveCampos)
+      )
+      : (
+        camposExistentes.has(chaveCampos) ||
+        camposCandidatosSemId.has(chaveCampos)
+      );
+    if (duplicado) {
+      duplicados++;
+      return;
+    }
+    if (identidade) identidadesCandidatas.add(identidadeComparavel);
+    else camposCandidatosSemId.add(chaveCampos);
+    candidatos.push(preparado.cliente);
+    if (preparado.ajustado) ajustados++;
+  });
+
+  return { candidatos, duplicados, invalidos, ajustados };
+}
+
+async function crmExecutarImportacao(lista, opcoes) {
+  const existentes = await crmCarregarClientes();
+  const plano = crmPlanejarImportacao(lista, existentes, opcoes);
+  let importados = 0;
+  let falhas = 0;
+
+  for (const cliente of plano.candidatos) {
+    try {
+      await crmSalvarCliente(cliente);
+      importados++;
+    } catch (erro) {
+      console.error('Erro ao importar cliente no CRM:', erro);
+      falhas++;
+    }
+  }
+
+  return {
+    importados,
+    duplicados: plano.duplicados,
+    invalidos: plano.invalidos,
+    ajustados: plano.ajustados,
+    falhas
+  };
+}
+
+function crmResumoImportacao(resultado, origem) {
+  const partes = [
+    resultado.importados + ' importado(s)',
+    resultado.duplicados + ' duplicado(s) ignorado(s)',
+    resultado.invalidos + ' invalido(s) ignorado(s)'
+  ];
+  if (resultado.ajustados) {
+    partes.push(resultado.ajustados + ' telefone(s) legado(s) preservado(s) nas observacoes');
+  }
+  if (resultado.falhas) partes.push(resultado.falhas + ' falha(s) de envio');
+  return (origem || 'Importacao') + ': ' + partes.join(', ') + '.';
+}
+
+async function crmMigrarLegadoSeConfirmado() {
+  if (crmMigracaoLegadoVerificada) return;
+  crmMigracaoLegadoVerificada = true;
+
+  let legados;
+  try {
+    legados = await crmCarregarClientesLegados();
+  } catch (erro) {
+    console.warn('Nao foi possivel verificar o CRM legado do navegador:', erro);
+    return;
+  }
+  if (!legados.length) return;
+
+  let existentes;
+  try {
+    existentes = await crmCarregarClientes();
+  } catch (erro) {
+    console.warn('Nao foi possivel comparar o CRM legado com o servidor:', erro);
+    return;
+  }
+
+  const opcoesMigracao = { preservarTelefoneInvalido: true };
+  const plano = crmPlanejarImportacao(legados, existentes, opcoesMigracao);
+  if (!plano.candidatos.length) return;
+
+  const mensagem =
+    'Foram encontrados ' + plano.candidatos.length +
+    ' cliente(s) no CRM antigo deste navegador que ainda nao estao no servidor.\n\n' +
+    'Deseja copia-los agora para o CRM central?\n\n' +
+    'Os dados antigos permanecerao intactos neste navegador.';
+  if (!window.confirm(mensagem)) return;
+
+  try {
+    const resultado = await crmExecutarImportacao(legados, opcoesMigracao);
+    window.alert(crmResumoImportacao(resultado, 'Migracao do CRM antigo'));
+  } catch (erro) {
+    console.error('Erro ao migrar o CRM antigo:', erro);
+    window.alert('Nao foi possivel concluir a migracao do CRM antigo: ' + erro.message);
+  }
+}
+
 async function crmRenderizar() {
-  const clientes = await crmCarregarClientes();
   const container = document.getElementById('crm-tabela-conteudo');
   if (!container) return;
+  let clientes;
+  try {
+    clientes = await crmCarregarClientes();
+  } catch (erro) {
+    console.error('Erro ao carregar o CRM do servidor:', erro);
+    container.innerHTML = '<div class="crm-vazio"><p>Nao foi possivel carregar o CRM do servidor.</p></div>';
+    return;
+  }
 
   let filtrados = clientes;
 
@@ -1334,8 +1642,8 @@ async function crmRenderizar() {
   if (crmBusca) {
     const busca = crmBusca.toLowerCase();
     filtrados = filtrados.filter(c =>
-      (c.nome && c.nome.toLowerCase().includes(busca)) ||
-      (c.empresa && c.empresa.toLowerCase().includes(busca))
+      String(c.nome || '').toLowerCase().includes(busca) ||
+      String(c.empresa || '').toLowerCase().includes(busca)
     );
   }
 
@@ -1397,14 +1705,14 @@ async function crmRenderizar() {
       <tbody>
         ${filtrados.map(c => `
           <tr>
-            <td>${c.nome || '—'}</td>
-            <td>${c.empresa || '—'}</td>
-            <td>${c.telefone || '—'}</td>
-            <td>${c.email || '—'}</td>
-            <td>${c.vendedor || '—'}</td>
+            <td>${crmEscaparHTML(c.nome || '—')}</td>
+            <td>${crmEscaparHTML(c.empresa || '—')}</td>
+            <td>${crmEscaparHTML(crmTelefoneExibicao(c.telefone, '—'))}</td>
+            <td>${crmEscaparHTML(c.email || '—')}</td>
+            <td>${crmEscaparHTML(c.vendedor || '—')}</td>
             <td class="col-acoes">
-              <button class="crm-btn-editar" onclick="crmEditarUI('${c.id}')">Editar</button>
-              <button class="crm-btn-excluir" onclick="crmExcluirUI('${c.id}')">Excluir</button>
+              <button class="crm-btn-editar" data-crm-acao="editar" data-crm-id="${crmEscaparHTML(c.id)}">Editar</button>
+              <button class="crm-btn-excluir" data-crm-acao="excluir" data-crm-id="${crmEscaparHTML(c.id)}">Excluir</button>
             </td>
           </tr>
         `).join('')}
@@ -1412,12 +1720,24 @@ async function crmRenderizar() {
     </table>`;
 
   container.innerHTML = html;
+  container.querySelectorAll('[data-crm-acao]').forEach(botao => {
+    botao.addEventListener('click', () => {
+      const id = botao.dataset.crmId || '';
+      if (botao.dataset.crmAcao === 'editar') crmEditarUI(id);
+      if (botao.dataset.crmAcao === 'excluir') crmExcluirUI(id);
+    });
+  });
 }
 
 async function crmExcluirUI(id) {
   if (!confirm('Excluir este cliente?')) return;
-  await crmExcluirCliente(id);
-  crmRenderizar();
+  try {
+    await crmExcluirCliente(id);
+    await crmRenderizar();
+  } catch (erro) {
+    console.error('Erro ao excluir cliente do CRM:', erro);
+    alert('Nao foi possivel excluir o cliente: ' + erro.message);
+  }
 }
 
 function crmNovoUI() {
@@ -1425,15 +1745,21 @@ function crmNovoUI() {
 }
 
 async function crmEditarUI(id) {
-  const clientes = await crmCarregarClientes();
-  const cliente = clientes.find(c => c.id === id);
-  if (cliente) crmAbrirModal(cliente);
+  try {
+    const clientes = await crmCarregarClientes();
+    const cliente = clientes.find(c => c.id === id);
+    if (cliente) crmAbrirModal(cliente);
+  } catch (erro) {
+    console.error('Erro ao abrir cliente do CRM:', erro);
+    alert('Nao foi possivel carregar o cliente: ' + erro.message);
+  }
 }
 
 function crmAbrirModal(cliente) {
   const eEdicao = !!cliente;
   const titulo = eEdicao ? 'Editar Cliente' : 'Cadastrar Cliente';
   const clienteId = cliente?.id || '';
+  const telefoneFormulario = crmTelefoneFormulario(cliente?.telefone);
 
   const modal = document.createElement('div');
   modal.className = 'modal-overlay modal-crm';
@@ -1449,19 +1775,23 @@ function crmAbrirModal(cliente) {
         <div class="modal-corpo">
           <div class="campo-grupo">
             <label>Nome *</label>
-            <input type="text" id="crm-nome" value="${(cliente?.nome || '').replace(/"/g, '&quot;')}" placeholder="Nome do cliente" />
+            <input type="text" id="crm-nome" value="${crmEscaparHTML(cliente?.nome)}" maxlength="200" placeholder="Nome do cliente" />
           </div>
           <div class="campo-grupo">
             <label>Empresa</label>
-            <input type="text" id="crm-empresa" value="${(cliente?.empresa || '').replace(/"/g, '&quot;')}" placeholder="Empresa" />
+            <input type="text" id="crm-empresa" value="${crmEscaparHTML(cliente?.empresa)}" maxlength="200" placeholder="Empresa" />
           </div>
           <div class="campo-grupo">
             <label>Telefone</label>
-            <input type="text" id="crm-telefone" value="${(cliente?.telefone || '').replace(/"/g, '&quot;')}" placeholder="(00) 00000-0000" />
+            <input type="tel" id="crm-telefone" value="${crmEscaparHTML(telefoneFormulario.telefone)}" inputmode="tel" autocomplete="tel" maxlength="19" placeholder="(00) 00000-0000" />
+          </div>
+          <div class="campo-grupo">
+            <label>Ramal</label>
+            <input type="text" id="crm-ramal" value="${crmEscaparHTML(telefoneFormulario.ramal)}" inputmode="numeric" maxlength="10" placeholder="Opcional" />
           </div>
           <div class="campo-grupo">
             <label>E-mail</label>
-            <input type="text" id="crm-email" value="${(cliente?.email || '').replace(/"/g, '&quot;')}" placeholder="email@exemplo.com" />
+            <input type="email" id="crm-email" value="${crmEscaparHTML(cliente?.email)}" maxlength="320" placeholder="email@exemplo.com" />
           </div>
           <div class="campo-grupo">
             <label>Vendedor</label>
@@ -1471,7 +1801,7 @@ function crmAbrirModal(cliente) {
           </div>
           <div class="campo-grupo">
             <label>Observacoes</label>
-            <textarea id="crm-obs" rows="3" placeholder="Notas sobre o cliente...">${cliente?.observacoes || ''}</textarea>
+            <textarea id="crm-obs" rows="3" maxlength="5000" placeholder="Notas sobre o cliente...">${crmEscaparHTML(cliente?.observacoes)}</textarea>
           </div>
         </div>
         <div class="modal-rodape">
@@ -1485,6 +1815,15 @@ function crmAbrirModal(cliente) {
   document.getElementById('btn-fechar-modal-crm').onclick = () => modal.remove();
   document.getElementById('btn-cancelar-modal-crm').onclick = () => modal.remove();
   document.getElementById('btn-salvar-modal-crm').onclick = () => crmSalvarUI(clienteId);
+  const campoTelefone = document.getElementById('crm-telefone');
+  const campoRamal = document.getElementById('crm-ramal');
+  campoTelefone.addEventListener('input', () => {
+    campoTelefone.value = DadosBrasileirosCRM.mascararTelefoneEntrada(campoTelefone.value);
+    campoTelefone.setCustomValidity('');
+  });
+  campoRamal.addEventListener('input', () => {
+    campoRamal.value = DadosBrasileirosCRM.somenteNumeros(campoRamal.value, 10);
+  });
 
   document.getElementById('crm-nome')?.focus();
 
@@ -1503,14 +1842,13 @@ async function carregarVendedoresSelect(vendedorAtual) {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     var vendedores = await resp.json();
 
-    select.innerHTML = '<option value="">Selecione o vendedor</option>';
-    vendedores.forEach(function(v) {
-      var selected = v.login === vendedorAtual ? 'selected' : '';
-      select.innerHTML += '<option value="' + v.login + '" ' + selected + '>' + (v.nome || v.login) + '</option>';
-    });
-    if (vendedorAtual && !vendedores.some(function(v) { return v.login === vendedorAtual; })) {
-      select.innerHTML += '<option value="' + vendedorAtual + '" selected>' + vendedorAtual + '</option>';
-    }
+    crmPreencherSelectVendedores(
+      select,
+      vendedores.map(function(v) {
+        return { valor: v.login, rotulo: v.nome || v.login };
+      }),
+      vendedorAtual
+    );
   } catch (err) {
     console.warn('Erro ao carregar vendedores da API:', err);
     // Fallback: usar vendedores dos clientes cadastrados no CRM
@@ -1518,11 +1856,11 @@ async function carregarVendedoresSelect(vendedorAtual) {
       var clientes = await crmCarregarClientes();
       var vendedoresUnicos = [];
       clientes.forEach(function(c) { if (c.vendedor && vendedoresUnicos.indexOf(c.vendedor) === -1) vendedoresUnicos.push(c.vendedor); });
-      select.innerHTML = '<option value="">Selecione o vendedor</option>';
-      vendedoresUnicos.forEach(function(v) {
-        var selected = v === vendedorAtual ? 'selected' : '';
-        select.innerHTML += '<option value="' + v + '" ' + selected + '>' + v + '</option>';
-      });
+      crmPreencherSelectVendedores(
+        select,
+        vendedoresUnicos.map(function(v) { return { valor: v, rotulo: v }; }),
+        vendedorAtual
+      );
     } catch (e2) {
       console.warn('Fallback CRM tambem falhou:', e2);
     }
@@ -1536,22 +1874,31 @@ async function crmSalvarUI(idExistente) {
       return;
     }
 
-    const cliente = {
-      id: idExistente || gerarId(),
-      nome,
-      empresa:    document.getElementById('crm-empresa')?.value?.trim() || '',
-      telefone:   document.getElementById('crm-telefone')?.value?.trim() || '',
-      email:      document.getElementById('crm-email')?.value?.trim() || '',
-      vendedor:   document.getElementById('crm-vendedor')?.value?.trim() || '',
-      observacoes: document.getElementById('crm-obs')?.value?.trim() || '',
-      dataAtualizacao: agora().toISOString()
-    };
-
-    if (!idExistente) {
-      cliente.dataCriacao = agora().toISOString();
+    const campoTelefone = document.getElementById('crm-telefone');
+    const telefone = crmTelefoneNormalizado(
+      campoTelefone?.value,
+      document.getElementById('crm-ramal')?.value
+    );
+    if (
+      !DadosBrasileirosCRM.valorAusente(campoTelefone?.value) &&
+      !telefone
+    ) {
+      campoTelefone.setCustomValidity('Informe um telefone brasileiro válido ou deixe o campo vazio.');
+      campoTelefone.reportValidity();
+      campoTelefone.focus();
+      return;
     }
 
-    await crmSalvarCliente(cliente);
+    const cliente = {
+      nome,
+      empresa:    document.getElementById('crm-empresa')?.value?.trim() || '',
+      telefone,
+      email:      document.getElementById('crm-email')?.value?.trim() || '',
+      vendedor:   document.getElementById('crm-vendedor')?.value?.trim() || '',
+      observacoes: document.getElementById('crm-obs')?.value?.trim() || ''
+    };
+
+    await crmSalvarCliente(cliente, idExistente);
     document.getElementById('modal-crm')?.remove();
     crmRenderizar();
   } catch (err) {
@@ -1571,20 +1918,53 @@ function crmBuscar(valor) {
 }
 
 async function crmExportarJSON() {
-  const clientes = await crmCarregarClientes();
-  const dados = {
-    clientes,
-    exportadoEm: agora().toISOString(),
-    origem: 'CRM Razor Industrial'
-  };
-  const json = JSON.stringify(dados, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'clientes-razor.json';
-  a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const clientes = await crmCarregarClientes();
+    const dados = {
+      clientes,
+      exportadoEm: agora().toISOString(),
+      origem: 'CRM Razor Industrial'
+    };
+    const json = JSON.stringify(dados, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'clientes-razor.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (erro) {
+    console.error('Erro ao exportar o CRM:', erro);
+    alert('Nao foi possivel exportar os clientes: ' + erro.message);
+  }
+}
+
+function crmPreencherSelectVendedores(select, vendedores, vendedorAtual) {
+  select.replaceChildren();
+  const opcaoInicial = document.createElement('option');
+  opcaoInicial.value = '';
+  opcaoInicial.textContent = 'Selecione o vendedor';
+  select.appendChild(opcaoInicial);
+
+  const valores = new Set();
+  (vendedores || []).forEach(function(vendedor) {
+    const valor = DadosBrasileirosCRM.textoSeguro(vendedor && vendedor.valor);
+    if (!valor || valores.has(valor)) return;
+    valores.add(valor);
+    const opcao = document.createElement('option');
+    opcao.value = valor;
+    opcao.textContent = DadosBrasileirosCRM.textoSeguro(vendedor.rotulo) || valor;
+    opcao.selected = valor === vendedorAtual;
+    select.appendChild(opcao);
+  });
+
+  if (vendedorAtual && !valores.has(vendedorAtual)) {
+    const opcaoAtual = document.createElement('option');
+    opcaoAtual.value = vendedorAtual;
+    opcaoAtual.textContent = vendedorAtual;
+    opcaoAtual.selected = true;
+    select.appendChild(opcaoAtual);
+  }
 }
 
 function crmImportarJSON() {
@@ -1603,23 +1983,11 @@ function crmImportarJSON() {
           alert('Arquivo JSON com formato inválido ou vazio.');
           return;
         }
-        for (const c of lista) {
-          if (c.nome) {
-            await crmSalvarCliente({
-              id: c.id || gerarId(),
-              nome: c.nome,
-              empresa: c.empresa || '',
-              telefone: c.telefone || '',
-              email: c.email || '',
-              vendedor: c.vendedor || '',
-              observacoes: c.observacoes || '',
-              dataCriacao: c.dataCriacao || agora().toISOString(),
-              dataAtualizacao: agora().toISOString()
-            });
-          }
-        }
-        crmRenderizar();
-        alert('Clientes importados com sucesso!');
+        const resultado = await crmExecutarImportacao(lista, {
+          preservarTelefoneInvalido: true
+        });
+        await crmRenderizar();
+        alert(crmResumoImportacao(resultado, 'Importacao do arquivo'));
       } catch (err) {
         alert('Erro ao ler o arquivo: ' + err.message);
       }
@@ -1887,6 +2255,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   fotosRenderizar();
 
   // Tela 6 — CRM
+  await crmMigrarLegadoSeConfirmado();
   crmRenderizar();
 });
 

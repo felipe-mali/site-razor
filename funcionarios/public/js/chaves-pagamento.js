@@ -4,6 +4,11 @@
 
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user'));
+const DadosBrasileiros = window.DadosBrasileiros;
+
+if (!DadosBrasileiros) {
+  throw new Error('O utilitario de dados brasileiros nao foi carregado.');
+}
 
 // Verificar permissao (admin ou quem pode gerenciar permissoes)
 if (!user || !token || (!user.pode_gerenciar_permissoes && user.cargo !== 'admin')) {
@@ -21,6 +26,89 @@ document.getElementById('btn-sair').addEventListener('click', () => {
 let funcionarios = [];
 let idParaExcluir = null;
 let fornecedores = [];
+
+function tipoPixNumerico(tipo) {
+  const normalizado = DadosBrasileiros.normalizarTipoChavePix(tipo);
+  return normalizado === 'CPF' || normalizado === 'CNPJ' || normalizado === 'Telefone';
+}
+
+function limiteDigitosChave(tipo) {
+  const normalizado = DadosBrasileiros.normalizarTipoChavePix(tipo);
+  if (normalizado === 'CPF') return 11;
+  if (normalizado === 'CNPJ') return 14;
+  if (normalizado === 'Telefone') return 13;
+  return null;
+}
+
+function formatarChaveParaEntrada(tipo, valor) {
+  const normalizado = DadosBrasileiros.normalizarTipoChavePix(tipo);
+  if (!tipoPixNumerico(normalizado)) return DadosBrasileiros.textoLiteral(valor);
+  if (normalizado === 'Telefone') {
+    return DadosBrasileiros.mascararTelefoneEntrada(valor);
+  }
+
+  const numeros = DadosBrasileiros.somenteNumeros(valor, limiteDigitosChave(normalizado));
+  if (!numeros) return '';
+  return DadosBrasileiros.formatarChavePix(normalizado, numeros, '') || numeros;
+}
+
+function configurarCampoChave(tipo, campo, reformatar) {
+  if (!campo) return;
+  const normalizado = DadosBrasileiros.normalizarTipoChavePix(tipo);
+  const numerico = tipoPixNumerico(normalizado);
+  campo.inputMode = numerico ? 'numeric' : (normalizado === 'Email' ? 'email' : 'text');
+  campo.autocomplete = normalizado === 'Email'
+    ? 'email'
+    : (normalizado === 'Telefone' ? 'tel' : 'off');
+  campo.maxLength = normalizado === 'CPF'
+    ? 14
+    : (normalizado === 'CNPJ' ? 18 : (normalizado === 'Telefone' ? 19 : 180));
+  if (reformatar) campo.value = formatarChaveParaEntrada(normalizado, campo.value);
+}
+
+function definirErroChave(mensagemElemento, campo, mensagem) {
+  if (!mensagemElemento) return;
+  mensagemElemento.textContent = mensagem || '';
+  mensagemElemento.style.display = mensagem ? '' : 'none';
+  if (campo) {
+    if (mensagem) campo.setAttribute('aria-invalid', 'true');
+    else campo.removeAttribute('aria-invalid');
+  }
+}
+
+function validarCampoChave(tipo, campo, mensagemElemento) {
+  const erro = DadosBrasileiros.erroChavePix(tipo, campo ? campo.value : '');
+  definirErroChave(mensagemElemento, campo, erro);
+  if (!erro && campo) campo.value = formatarChaveParaEntrada(tipo, campo.value);
+  return !erro;
+}
+
+function exibirTipoPix(tipo) {
+  return DadosBrasileiros.normalizarTipoChavePix(tipo) ||
+    DadosBrasileiros.textoSeguro(tipo) ||
+    '—';
+}
+
+function exibirChavePix(tipo, valor) {
+  const normalizado = DadosBrasileiros.normalizarTipoChavePix(tipo);
+  if (!normalizado) return '—';
+  const texto = tipoPixNumerico(normalizado)
+    ? DadosBrasileiros.textoSeguro(valor)
+    : DadosBrasileiros.textoLiteral(valor);
+  if (!texto) return '—';
+  if (tipoPixNumerico(normalizado)) {
+    return DadosBrasileiros.formatarChavePix(normalizado, texto, '—');
+  }
+  return DadosBrasileiros.formatarChavePix(normalizado, texto, '') || texto;
+}
+
+function dadosPagamentoFornecedor(fornecedor) {
+  if ((fornecedor.forma_pagamento || 'PIX') !== 'PIX') return 'Pagamento por boleto';
+  const tipo = exibirTipoPix(fornecedor.tipo_pix);
+  const chave = exibirChavePix(fornecedor.tipo_pix, fornecedor.chave_pix);
+  if (tipo === '—' || chave === '—') return '—';
+  return tipo + ' · ' + chave;
+}
 
 // Sanitizacao basica para prevenir XSS
 function escapar(str) {
@@ -44,27 +132,7 @@ function nomeExibicao(f) {
 
 // Validacao de chave conforme tipo
 function validarChave(tipo, chave) {
-  if (!chave || !chave.trim()) return 'Chave PIX e obrigatoria.';
-  const val = chave.trim();
-  switch (tipo) {
-    case 'CPF':
-      if (!/^\d{11}$/.test(val)) return 'CPF deve conter exatamente 11 numeros.';
-      break;
-    case 'CNPJ':
-      if (!/^\d{14}$/.test(val)) return 'CNPJ deve conter exatamente 14 numeros.';
-      break;
-    case 'Telefone':
-      if (!/^\d{10,11}$/.test(val)) return 'Telefone deve conter 10 ou 11 numeros.';
-      break;
-    case 'Email':
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return 'Formato de email invalido.';
-      break;
-    case 'Aleatoria':
-      // chave aleatoria: qualquer coisa com 1+ caracteres
-      if (val.length < 1) return 'Chave aleatoria nao pode ser vazia.';
-      break;
-  }
-  return null;
+  return DadosBrasileiros.erroChavePix(tipo, chave);
 }
 
 // Carregar chaves
@@ -75,7 +143,9 @@ async function carregarChaves() {
     });
     if (!resp.ok) throw new Error('Erro ao carregar');
     const data = await resp.json();
-    funcionarios = data.funcionarios || [];
+    funcionarios = Array.isArray(data.funcionarios)
+      ? data.funcionarios.filter(item => item && typeof item === 'object')
+      : [];
     renderizarTabela(funcionarios);
   } catch (err) {
     console.error(err);
@@ -100,8 +170,8 @@ function renderizarTabela(lista) {
   tbody.innerHTML = lista.map(f => `
     <tr>
       <td>${escapar(nomeExibicao(f))}</td>
-      <td>${escapar(f.tipo_pix)}</td>
-      <td>${escapar(f.chave_pix)}</td>
+      <td>${escapar(exibirTipoPix(f.tipo_pix))}</td>
+      <td>${escapar(exibirChavePix(f.tipo_pix, f.chave_pix))}</td>
       <td>
         <button class="btn-editar" onclick="editarChave('${f.id}')">Editar</button>
         <button class="btn-excluir" onclick="abrirModalConfirm('${f.id}')">Excluir</button>
@@ -125,7 +195,7 @@ function abrirModal(id) {
   const modal = document.getElementById('modal');
   const title = document.getElementById('modal-title');
   const msgErro = document.getElementById('msg-erro');
-  msgErro.style.display = 'none';
+  definirErroChave(msgErro, document.getElementById('input-chave'), '');
 
   document.getElementById('edit-id').value = '';
   document.getElementById('input-funcionario').value = '';
@@ -140,13 +210,19 @@ function abrirModal(id) {
       document.getElementById('edit-id').value = f.id;
       document.getElementById('input-funcionario').value = f.funcionario;
       document.getElementById('input-apelido').value = f.apelido || '';
-      document.getElementById('input-tipo').value = f.tipo_pix;
+      document.getElementById('input-tipo').value =
+        DadosBrasileiros.normalizarTipoChavePix(f.tipo_pix);
       document.getElementById('input-chave').value = f.chave_pix;
     }
   } else {
     title.textContent = 'Novo Funcionario';
   }
 
+  configurarCampoChave(
+    document.getElementById('input-tipo').value,
+    document.getElementById('input-chave'),
+    true
+  );
   modal.classList.add('active');
 }
 
@@ -189,13 +265,16 @@ async function confirmarExclusao() {
 document.getElementById('chave-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const msgErro = document.getElementById('msg-erro');
-  msgErro.style.display = 'none';
+  const campoChave = document.getElementById('input-chave');
+  definirErroChave(msgErro, campoChave, '');
 
   const editId = document.getElementById('edit-id').value;
   const funcionario = document.getElementById('input-funcionario').value.trim();
   const apelido = document.getElementById('input-apelido').value.trim();
-  const tipo_pix = document.getElementById('input-tipo').value;
-  const chave_pix = document.getElementById('input-chave').value.trim();
+  const tipo_pix = DadosBrasileiros.normalizarTipoChavePix(
+    document.getElementById('input-tipo').value
+  );
+  const chaveInformada = campoChave.value;
 
   // Validacoes
   if (!funcionario) {
@@ -210,12 +289,12 @@ document.getElementById('chave-form').addEventListener('submit', async (e) => {
     return;
   }
 
-  const erroChave = validarChave(tipo_pix, chave_pix);
+  const erroChave = validarChave(tipo_pix, chaveInformada);
   if (erroChave) {
-    msgErro.textContent = erroChave;
-    msgErro.style.display = '';
+    definirErroChave(msgErro, campoChave, erroChave);
     return;
   }
+  const chave_pix = DadosBrasileiros.normalizarChavePix(tipo_pix, chaveInformada);
 
   // Verificar nome duplicado
   const nomeDuplicado = funcionarios.find(f =>
@@ -228,8 +307,10 @@ document.getElementById('chave-form').addEventListener('submit', async (e) => {
   }
 
   // Verificar chave duplicada
+  const chaveComparavel = DadosBrasileiros.chavePixComparavel(tipo_pix, chave_pix);
   const chaveDuplicada = funcionarios.find(f =>
-    f.chave_pix === chave_pix && f.id !== editId
+    DadosBrasileiros.chavePixComparavel(f.tipo_pix, f.chave_pix) === chaveComparavel &&
+    f.id !== editId
   );
   if (chaveDuplicada) {
     msgErro.textContent = 'Esta chave PIX ja esta cadastrada.';
@@ -282,7 +363,10 @@ async function carregarFornecedores() {
       return;
     }
     if (!resp.ok) throw new Error('Erro ao carregar fornecedores');
-    fornecedores = ((await resp.json()).fornecedores || []).sort((a, b) =>
+    const data = await resp.json();
+    fornecedores = (Array.isArray(data.fornecedores)
+      ? data.fornecedores.filter(item => item && typeof item === 'object')
+      : []).sort((a, b) =>
       String(a.apelido || a.nome || '').localeCompare(
         String(b.apelido || b.nome || ''),
         'pt-BR',
@@ -295,7 +379,7 @@ async function carregarFornecedores() {
       <tr>
         <td>${escapar(f.apelido || f.nome)}</td>
         <td>${escapar(f.forma_pagamento || 'PIX')}</td>
-        <td>${(f.forma_pagamento || 'PIX') === 'PIX' ? escapar(f.tipo_pix + ' · ' + f.chave_pix) : 'Pagamento por boleto'}</td>
+        <td>${escapar(dadosPagamentoFornecedor(f))}</td>
         <td>
           <button class="btn-editar" onclick="abrirModalFornecedor('${f.id}')">Editar</button>
           <button class="btn-excluir" onclick="excluirFornecedor('${f.id}')">Excluir</button>
@@ -313,12 +397,23 @@ function abrirModalFornecedor(id) {
   document.getElementById('fornecedor-nome').value = fornecedor ? fornecedor.nome : '';
   document.getElementById('fornecedor-apelido').value = fornecedor ? (fornecedor.apelido || '') : '';
   document.getElementById('fornecedor-forma').value = fornecedor ? (fornecedor.forma_pagamento || 'PIX') : 'PIX';
-  document.getElementById('fornecedor-tipo').value = fornecedor ? fornecedor.tipo_pix : '';
+  document.getElementById('fornecedor-tipo').value = fornecedor
+    ? DadosBrasileiros.normalizarTipoChavePix(fornecedor.tipo_pix)
+    : '';
   document.getElementById('fornecedor-chave').value = fornecedor ? fornecedor.chave_pix : '';
   document.getElementById('modal-fornecedor-title').textContent = fornecedor ? 'Editar Fornecedor' : 'Novo Fornecedor';
-  document.getElementById('fornecedor-msg-erro').style.display = 'none';
+  definirErroChave(
+    document.getElementById('fornecedor-msg-erro'),
+    document.getElementById('fornecedor-chave'),
+    ''
+  );
   document.getElementById('modal-fornecedor').classList.add('active');
   atualizarCamposPix();
+  configurarCampoChave(
+    document.getElementById('fornecedor-tipo').value,
+    document.getElementById('fornecedor-chave'),
+    true
+  );
 }
 
 function fecharModalFornecedor() {
@@ -338,21 +433,39 @@ async function excluirFornecedor(id) {
 document.getElementById('fornecedor-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const erro = document.getElementById('fornecedor-msg-erro');
-  erro.style.display = 'none';
+  const campoChave = document.getElementById('fornecedor-chave');
+  definirErroChave(erro, campoChave, '');
   const id = document.getElementById('fornecedor-edit-id').value;
   const body = {
     nome: document.getElementById('fornecedor-nome').value.trim(),
     apelido: document.getElementById('fornecedor-apelido').value.trim(),
     forma_pagamento: document.getElementById('fornecedor-forma').value,
-    tipo_pix: document.getElementById('fornecedor-forma').value === 'PIX' ? document.getElementById('fornecedor-tipo').value : '',
-    chave_pix: document.getElementById('fornecedor-forma').value === 'PIX' ? document.getElementById('fornecedor-chave').value.trim() : ''
+    tipo_pix: document.getElementById('fornecedor-forma').value === 'PIX'
+      ? DadosBrasileiros.normalizarTipoChavePix(document.getElementById('fornecedor-tipo').value)
+      : '',
+    chave_pix: document.getElementById('fornecedor-forma').value === 'PIX'
+      ? campoChave.value
+      : ''
   };
   const usaPix = body.forma_pagamento === 'PIX';
   const erroChave = usaPix ? validarChave(body.tipo_pix, body.chave_pix) : null;
   if (!body.nome || (usaPix && !body.tipo_pix) || erroChave) {
     erro.textContent = !body.nome ? 'Nome do fornecedor é obrigatório.' : (!body.tipo_pix ? 'Selecione o tipo da chave.' : erroChave);
     erro.style.display = '';
+    if (erroChave) campoChave.setAttribute('aria-invalid', 'true');
     return;
+  }
+  if (usaPix) {
+    body.chave_pix = DadosBrasileiros.normalizarChavePix(body.tipo_pix, body.chave_pix);
+    const chaveComparavel = DadosBrasileiros.chavePixComparavel(body.tipo_pix, body.chave_pix);
+    const chaveDuplicada = fornecedores.find(f =>
+      f.id !== id &&
+      DadosBrasileiros.chavePixComparavel(f.tipo_pix, f.chave_pix) === chaveComparavel
+    );
+    if (chaveDuplicada) {
+      definirErroChave(erro, campoChave, 'Esta chave PIX ja esta cadastrada.');
+      return;
+    }
   }
   try {
     const resp = await fetch('/api/fornecedores-pagamento' + (id ? '/' + id : ''), {
@@ -375,9 +488,41 @@ function atualizarCamposPix() {
   document.getElementById('fornecedor-campos-pix').style.display = usaPix ? '' : 'none';
   document.getElementById('fornecedor-tipo').required = usaPix;
   document.getElementById('fornecedor-chave').required = usaPix;
+  if (!usaPix) {
+    definirErroChave(
+      document.getElementById('fornecedor-msg-erro'),
+      document.getElementById('fornecedor-chave'),
+      ''
+    );
+  }
 }
 
 document.getElementById('fornecedor-forma').addEventListener('change', atualizarCamposPix);
+
+function registrarEventosCampoChave(tipoId, chaveId, erroId) {
+  const tipo = document.getElementById(tipoId);
+  const campo = document.getElementById(chaveId);
+  const erro = document.getElementById(erroId);
+  if (!tipo || !campo || !erro) return;
+
+  tipo.addEventListener('change', () => {
+    configurarCampoChave(tipo.value, campo, true);
+    definirErroChave(erro, campo, '');
+  });
+  campo.addEventListener('input', () => {
+    if (tipoPixNumerico(tipo.value)) {
+      campo.value = formatarChaveParaEntrada(tipo.value, campo.value);
+    }
+    definirErroChave(erro, campo, '');
+  });
+  campo.addEventListener('blur', () => {
+    if (!campo.required && DadosBrasileiros.valorAusente(campo.value)) return;
+    validarCampoChave(tipo.value, campo, erro);
+  });
+}
+
+registrarEventosCampoChave('input-tipo', 'input-chave', 'msg-erro');
+registrarEventosCampoChave('fornecedor-tipo', 'fornecedor-chave', 'fornecedor-msg-erro');
 
 carregarChaves();
 carregarFornecedores();

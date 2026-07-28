@@ -1,0 +1,28 @@
+# Dependências são reconstruídas pelos package-lock.json.
+node_modules/
+**/node_modules/
+
+# Configuração específica de cada ambiente.
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# Artefatos, logs e ferramentas locais.
+dist/
+*.log
+npm-debug.log*
+*.bak
+*.tmp
+.razor-write-test-*
+.agents/
+.codex/
+.mimocode/
+
+# Cópias históricas não fazem parte da aplicação implantável.
+funcionarios/_backup_reorganizacao/
+funcionarios/legacy-funcionario/
+
+# Imagens enviadas em produção devem ficar no volume persistente.
+funcionarios/rede/*
+!funcionarios/rede/.gitkeep

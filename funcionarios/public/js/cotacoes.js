@@ -4,6 +4,7 @@
   var Financeiro = window.CotacoesFinanceiro;
   var Modelo = window.CotacoesModelo;
   var PrintView = window.CotacoesPrintView;
+  var DadosBrasileiros = window.DadosBrasileiros;
   var estado = Modelo ? Modelo.criarEstado() : null;
   var calculos = null;
   var elementos = {};
@@ -387,7 +388,12 @@
       throw new Error('Sessão expirada. Faça login novamente.');
     }
     if (!resposta.ok) throw new Error('Não foi possível carregar os fornecedores.');
-    fornecedoresCadastrados = (await resposta.json()).fornecedores || [];
+    var data = await resposta.json();
+    fornecedoresCadastrados = Array.isArray(data.fornecedores)
+      ? data.fornecedores.filter(function (item) {
+          return item && typeof item === 'object';
+        })
+      : [];
     renderizarFornecedoresCadastrados();
   }
 
@@ -395,7 +401,7 @@
     elementos.fornecedorModal.hidden = true;
     elementos.fornecedorForm.hidden = true;
     elementos.fornecedorNovo.hidden = false;
-    elementos.fornecedorErro.textContent = '';
+    mostrarErroChavePix('');
   }
 
   async function adicionarFornecedor() {
@@ -418,23 +424,110 @@
     if (fornecedor && inserirFornecedorNaCotacao(nomeFornecedorCadastrado(fornecedor))) fecharModalFornecedor();
   }
 
+  function tipoPixNumerico(tipo) {
+    var normalizado = DadosBrasileiros.normalizarTipoChavePix(tipo);
+    return normalizado === 'CPF' || normalizado === 'CNPJ' || normalizado === 'Telefone';
+  }
+
+  function limiteDigitosChavePix(tipo) {
+    var normalizado = DadosBrasileiros.normalizarTipoChavePix(tipo);
+    if (normalizado === 'CPF') return 11;
+    if (normalizado === 'CNPJ') return 14;
+    if (normalizado === 'Telefone') return 13;
+    return null;
+  }
+
+  function formatarChavePixParaEntrada(tipo, valor) {
+    var normalizado = DadosBrasileiros.normalizarTipoChavePix(tipo);
+    if (!tipoPixNumerico(normalizado)) return DadosBrasileiros.textoLiteral(valor);
+    if (normalizado === 'Telefone') {
+      return DadosBrasileiros.mascararTelefoneEntrada(valor);
+    }
+    var numeros = DadosBrasileiros.somenteNumeros(valor, limiteDigitosChavePix(normalizado));
+    if (!numeros) return '';
+    return DadosBrasileiros.formatarChavePix(normalizado, numeros, '') || numeros;
+  }
+
+  function configurarCampoChavePix(reformatar) {
+    var tipo = DadosBrasileiros.normalizarTipoChavePix(elementos.fornecedorTipo.value);
+    var numerico = tipoPixNumerico(tipo);
+    elementos.fornecedorChave.inputMode = numerico ? 'numeric' : (tipo === 'Email' ? 'email' : 'text');
+    elementos.fornecedorChave.autocomplete = tipo === 'Email'
+      ? 'email'
+      : (tipo === 'Telefone' ? 'tel' : 'off');
+    elementos.fornecedorChave.maxLength = tipo === 'CPF'
+      ? 14
+      : (tipo === 'CNPJ' ? 18 : (tipo === 'Telefone' ? 19 : 180));
+    if (reformatar) {
+      elementos.fornecedorChave.value = formatarChavePixParaEntrada(
+        tipo,
+        elementos.fornecedorChave.value
+      );
+    }
+  }
+
+  function mostrarErroChavePix(mensagem) {
+    elementos.fornecedorErro.textContent = mensagem || '';
+    if (mensagem) elementos.fornecedorChave.setAttribute('aria-invalid', 'true');
+    else elementos.fornecedorChave.removeAttribute('aria-invalid');
+  }
+
+  function validarCampoChavePix() {
+    var erro = DadosBrasileiros.erroChavePix(
+      elementos.fornecedorTipo.value,
+      elementos.fornecedorChave.value
+    );
+    mostrarErroChavePix(erro);
+    if (!erro) {
+      elementos.fornecedorChave.value = formatarChavePixParaEntrada(
+        elementos.fornecedorTipo.value,
+        elementos.fornecedorChave.value
+      );
+    }
+    return !erro;
+  }
+
   function atualizarCamposPixFornecedor() {
     var usaPix = elementos.fornecedorForma.value === 'PIX';
     elementos.fornecedorCamposPix.hidden = !usaPix;
     elementos.fornecedorTipo.required = usaPix;
     elementos.fornecedorChave.required = usaPix;
+    configurarCampoChavePix(true);
+    if (!usaPix) mostrarErroChavePix('');
   }
 
   async function salvarNovoFornecedor(evento) {
     evento.preventDefault();
-    elementos.fornecedorErro.textContent = '';
+    mostrarErroChavePix('');
+    var usaPix = elementos.fornecedorForma.value === 'PIX';
     var body = {
       nome: elementos.fornecedorNome.value.trim(),
       apelido: elementos.fornecedorApelido.value.trim(),
       forma_pagamento: elementos.fornecedorForma.value,
-      tipo_pix: elementos.fornecedorForma.value === 'PIX' ? elementos.fornecedorTipo.value : '',
-      chave_pix: elementos.fornecedorForma.value === 'PIX' ? elementos.fornecedorChave.value.trim() : ''
+      tipo_pix: usaPix
+        ? DadosBrasileiros.normalizarTipoChavePix(elementos.fornecedorTipo.value)
+        : '',
+      chave_pix: usaPix ? elementos.fornecedorChave.value : ''
     };
+    if (usaPix) {
+      var erroChave = DadosBrasileiros.erroChavePix(body.tipo_pix, body.chave_pix);
+      if (erroChave) {
+        mostrarErroChavePix(erroChave);
+        return;
+      }
+      body.chave_pix = DadosBrasileiros.normalizarChavePix(body.tipo_pix, body.chave_pix);
+      var chaveComparavel = DadosBrasileiros.chavePixComparavel(body.tipo_pix, body.chave_pix);
+      var chaveDuplicada = fornecedoresCadastrados.some(function (fornecedor) {
+        return DadosBrasileiros.chavePixComparavel(
+          fornecedor.tipo_pix,
+          fornecedor.chave_pix
+        ) === chaveComparavel;
+      });
+      if (chaveDuplicada) {
+        mostrarErroChavePix('Esta chave PIX já está cadastrada.');
+        return;
+      }
+    }
     try {
       var resposta = await window.fetch('/api/fornecedores-pagamento', {
         method: 'POST',
@@ -453,6 +546,7 @@
       fecharModalFornecedor();
     } catch (erro) {
       elementos.fornecedorErro.textContent = erro.message;
+      elementos.fornecedorChave.removeAttribute('aria-invalid');
     }
   }
 
@@ -697,6 +791,24 @@
     });
     elementos.fornecedorLista.addEventListener('click', selecionarFornecedorCadastrado);
     elementos.fornecedorForma.addEventListener('change', atualizarCamposPixFornecedor);
+    elementos.fornecedorTipo.addEventListener('change', function () {
+      configurarCampoChavePix(true);
+      mostrarErroChavePix('');
+    });
+    elementos.fornecedorChave.addEventListener('input', function () {
+      if (tipoPixNumerico(elementos.fornecedorTipo.value)) {
+        elementos.fornecedorChave.value = formatarChavePixParaEntrada(
+          elementos.fornecedorTipo.value,
+          elementos.fornecedorChave.value
+        );
+      }
+      mostrarErroChavePix('');
+    });
+    elementos.fornecedorChave.addEventListener('blur', function () {
+      if (elementos.fornecedorForma.value === 'PIX' && !elementos.fornecedorForm.hidden) {
+        validarCampoChavePix();
+      }
+    });
     elementos.fornecedorForm.addEventListener('submit', salvarNovoFornecedor);
     elementos.fornecedorModal.addEventListener('click', function (evento) {
       if (evento.target === elementos.fornecedorModal) fecharModalFornecedor();
@@ -749,7 +861,14 @@
       executarImpressao: porId('cotacoes-print-executar'),
       documentoImpressao: porId('cotacoes-print-document')
     };
-    if (!Financeiro || !Modelo || !PrintView || !elementos.app || !elementos.tabela) return false;
+    if (
+      !Financeiro ||
+      !Modelo ||
+      !PrintView ||
+      !DadosBrasileiros ||
+      !elementos.app ||
+      !elementos.tabela
+    ) return false;
     registrarEventos();
     sincronizarCamposImpressao();
     renderizarTabela();

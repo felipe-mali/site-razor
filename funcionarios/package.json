@@ -7,8 +7,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node test-cotacoes.js && node test-comprovante-entrega.js",
+    "test": "node test-dados-brasileiros.js && node test-cotacoes.js && node test-comprovante-entrega.js && node test-crm.js",
+    "test:dados": "node test-dados-brasileiros.js",
     "test:comprovante": "node test-comprovante-entrega.js",
+    "test:crm": "node test-crm.js",
     "start": "node server.js",
     "dev": "node server.js"
   },

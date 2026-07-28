@@ -4,6 +4,7 @@
   var Config = root.ComprovanteEntregaConfig;
   var Modelo = root.ComprovanteEntregaModelo;
   var Pdf = root.ComprovanteEntregaPdf;
+  var DadosBrasileiros = root.DadosBrasileiros;
   var estado = {
     inicializado: false,
     carregando: false,
@@ -68,16 +69,18 @@
   function renderizarEmitente() {
     if (!refs.emitente || !Config || !Config.EMPRESA) return;
     var empresa = Config.EMPRESA;
+    var cnpj = DadosBrasileiros.formatarCnpj(empresa.cnpj);
+    var telefone = DadosBrasileiros.formatarTelefone(empresa.telefone);
     refs.emitente.replaceChildren();
 
     var nome = criarElemento('strong', 'ce-issuer-name', empresa.razaoSocial);
     var detalhes = criarElemento('div', 'ce-issuer-details');
     [
-      'CNPJ ' + empresa.cnpj,
+      cnpj ? 'CNPJ ' + cnpj : '',
       empresa.endereco,
       empresa.cidade + ' • CEP ' + empresa.cep,
-      'Telefone ' + empresa.telefone
-    ].forEach(function (linha) {
+      telefone ? 'Telefone ' + telefone : ''
+    ].filter(Boolean).forEach(function (linha) {
       detalhes.appendChild(criarElemento('span', '', linha));
     });
     refs.emitente.appendChild(nome);
@@ -219,6 +222,7 @@
     var mapa = {
       'destinatario.nome': '[data-name="destinatario"]',
       'destinatario.endereco': '[data-name="endereco"]',
+      'destinatario.documento': '[data-name="documento"]',
       dataEntrega: '[data-name="dataEntrega"]',
       frete: '[data-name="frete"]',
       totais: '[data-name="frete"]',
@@ -508,7 +512,14 @@
   }
 
   function init() {
-    if (estado.inicializado || !root.document || !Config || !Modelo || !Pdf) return false;
+    if (
+      estado.inicializado ||
+      !root.document ||
+      !Config ||
+      !Modelo ||
+      !Pdf ||
+      !DadosBrasileiros
+    ) return false;
     refs.form = porId('ce-form');
     if (!refs.form) return false;
     refs.status = porId('ce-status');

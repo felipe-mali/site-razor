@@ -1,0 +1,28 @@
+services:
+  razor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: razor-plataforma:local
+    restart: unless-stopped
+    init: true
+    environment:
+      PORT: "${PORT:-8080}"
+      HOST: "${HOST:-0.0.0.0}"
+      CLIENTES_INTERNAL_PORT: "${CLIENTES_INTERNAL_PORT:-3000}"
+      FUNCIONARIOS_INTERNAL_PORT: "${FUNCIONARIOS_INTERNAL_PORT:-3001}"
+      CLIENTES_URL: "${CLIENTES_URL:-/}"
+      FUNCIONARIOS_URL: "${FUNCIONARIOS_URL:-/funcionarios/}"
+      NODE_ENV: "${NODE_ENV:-production}"
+      PROXY_TIMEOUT_MS: "${PROXY_TIMEOUT_MS:-30000}"
+      STARTUP_TIMEOUT_MS: "${STARTUP_TIMEOUT_MS:-20000}"
+      HEALTH_TIMEOUT_MS: "${HEALTH_TIMEOUT_MS:-3000}"
+    ports:
+      - "${PUBLIC_PORT:-8080}:${PORT:-8080}"
+    volumes:
+      - funcionarios_data:/app/funcionarios/data
+      - funcionarios_rede:/app/funcionarios/rede
+
+volumes:
+  funcionarios_data:
+  funcionarios_rede:

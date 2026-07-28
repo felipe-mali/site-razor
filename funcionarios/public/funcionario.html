@@ -396,7 +396,7 @@
                 </div>
                 <div class="cotacoes-field">
                   <label for="cotacoes-fornecedor-chave">Chave PIX</label>
-                  <input id="cotacoes-fornecedor-chave" type="text" maxlength="180" required>
+                  <input id="cotacoes-fornecedor-chave" type="text" maxlength="180" inputmode="text" autocomplete="off" aria-describedby="cotacoes-fornecedor-erro" required>
                 </div>
               </div>
               <p id="cotacoes-fornecedor-erro" class="cotacoes-supplier-error" role="alert"></p>
@@ -681,6 +681,7 @@
   </main>
   <footer class="rodape"><span>Calculadoras Industriais - Razor Industrial | Dados salvos no servidor.</span></footer>
   <script src="js/app.js"></script>
+  <script src="js/dados-brasileiros.js"></script>
   <script src="js/cotacoes-financeiro.js"></script>
   <script src="js/cotacoes-modelo.js"></script>
   <script src="js/comprovante-entrega-config.js"></script>

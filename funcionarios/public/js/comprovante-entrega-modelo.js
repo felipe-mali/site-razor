@@ -4,13 +4,21 @@
   var config = typeof module === 'object' && module.exports
     ? require('./comprovante-entrega-config')
     : root && root.ComprovanteEntregaConfig;
-  var api = factory(config);
+  var dadosBrasileiros = typeof module === 'object' && module.exports
+    ? require('./dados-brasileiros')
+    : root && root.DadosBrasileiros;
+  var api = factory(config, dadosBrasileiros);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.ComprovanteEntregaModelo = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function criarComprovanteEntregaModelo(Config) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function criarComprovanteEntregaModelo(
+  Config,
+  DadosBrasileiros
+) {
   'use strict';
 
-  if (!Config) throw new Error('ComprovanteEntregaConfig é obrigatório.');
+  if (!Config || !DadosBrasileiros) {
+    throw new Error('ComprovanteEntregaConfig e DadosBrasileiros são obrigatórios.');
+  }
 
   var MAXIMO_SEGURO = BigInt(Number.MAX_SAFE_INTEGER);
 
@@ -253,34 +261,17 @@
   }
 
   function mascararCpf(valor) {
-    var digitos = somenteDigitos(valor, 11);
-    if (digitos.length <= 3) return digitos;
-    if (digitos.length <= 6) return digitos.slice(0, 3) + '.' + digitos.slice(3);
-    if (digitos.length <= 9) {
-      return digitos.slice(0, 3) + '.' + digitos.slice(3, 6) + '.' + digitos.slice(6);
-    }
-    return digitos.slice(0, 3) + '.' + digitos.slice(3, 6) + '.' +
-      digitos.slice(6, 9) + '-' + digitos.slice(9);
+    var digitos = DadosBrasileiros.somenteNumeros(valor, 11);
+    return DadosBrasileiros.formatarCpf(digitos) || digitos;
   }
 
   function mascararCnpj(valor) {
-    var digitos = somenteDigitos(valor, 14);
-    if (digitos.length <= 2) return digitos;
-    if (digitos.length <= 5) return digitos.slice(0, 2) + '.' + digitos.slice(2);
-    if (digitos.length <= 8) {
-      return digitos.slice(0, 2) + '.' + digitos.slice(2, 5) + '.' + digitos.slice(5);
-    }
-    if (digitos.length <= 12) {
-      return digitos.slice(0, 2) + '.' + digitos.slice(2, 5) + '.' +
-        digitos.slice(5, 8) + '/' + digitos.slice(8);
-    }
-    return digitos.slice(0, 2) + '.' + digitos.slice(2, 5) + '.' +
-      digitos.slice(5, 8) + '/' + digitos.slice(8, 12) + '-' + digitos.slice(12);
+    var digitos = DadosBrasileiros.somenteNumeros(valor, 14);
+    return DadosBrasileiros.formatarCnpj(digitos) || digitos;
   }
 
   function mascararCpfCnpj(valor) {
-    var digitos = somenteDigitos(valor, 14);
-    return digitos.length <= 11 ? mascararCpf(digitos) : mascararCnpj(digitos);
+    return DadosBrasileiros.mascararCpfCnpjEntrada(valor);
   }
 
   function mascararCep(valor) {
@@ -338,6 +329,10 @@
     var venda = escolherObjeto(entrada, ['dadosVenda', 'venda']);
     var origemVenda = Object.keys(venda).length ? venda : entrada;
     var destinatarioEntrada = escolherObjeto(entrada, ['destinatario', 'cliente']);
+    var documentoEntrada = escolherValor(
+      destinatarioEntrada,
+      ['documento', 'cpfCnpj', 'cnpjCpf', 'cpf', 'cnpj']
+    );
     var itensEntrada = Array.isArray(entrada.itens)
       ? entrada.itens
       : (Array.isArray(entrada.mercadorias) ? entrada.mercadorias : []);
@@ -384,9 +379,7 @@
           escolherValor(destinatarioEntrada, ['nome', 'razaoSocial', 'destinatario']),
           300
         ),
-        documento: mascararCpfCnpj(
-          escolherValor(destinatarioEntrada, ['documento', 'cpfCnpj', 'cnpjCpf', 'cpf', 'cnpj'])
-        ),
+        documento: DadosBrasileiros.formatarCpfCnpj(documentoEntrada),
         inscricaoEstadual: textoLimpo(
           escolherValor(destinatarioEntrada, ['inscricaoEstadual', 'ie']),
           80
@@ -446,6 +439,11 @@
     var itensEntrada = Array.isArray(entrada.itens)
       ? entrada.itens
       : (Array.isArray(entrada.mercadorias) ? entrada.mercadorias : []);
+    var destinatarioEntrada = escolherObjeto(entrada, ['destinatario', 'cliente']);
+    var documentoEntrada = escolherValor(
+      destinatarioEntrada,
+      ['documento', 'cpfCnpj', 'cnpjCpf', 'cpf', 'cnpj']
+    );
 
     if (!dados.destinatario.nome) {
       adicionarErro(
@@ -461,6 +459,17 @@
         errosPorCampo,
         'destinatario.endereco',
         'Informe o endereço da entrega.'
+      );
+    }
+    if (
+      !DadosBrasileiros.valorAusente(documentoEntrada) &&
+      !DadosBrasileiros.validarCpfCnpj(documentoEntrada)
+    ) {
+      adicionarErro(
+        erros,
+        errosPorCampo,
+        'destinatario.documento',
+        'Informe um CPF ou CNPJ válido, ou deixe o campo vazio.'
       );
     }
     if (!partesData(dados.dataEntrega)) {
