@@ -11,7 +11,7 @@
     "pode_acessar_cotacoes": true
   },
   "felipe": {
-    "senha": "Lim@0207",
+    "senha": "Lim@020707",
     "nome": "Engenheiro Felipe",
     "cargo": "engenheiro",
     "ativo": true,
@@ -58,6 +58,17 @@
     "senha": "D@cris83",
     "nome": "Comercial 3",
     "cargo": "vendedor",
+    "ativo": true,
+    "pode_ver_funcionario": true,
+    "pode_ver_imagens": true,
+    "pode_editar_imagens": true,
+    "pode_gerenciar_permissoes": true,
+    "pode_acessar_cotacoes": true
+  },
+  "Tiago": {
+    "senha": "T1ago123",
+    "nome": "Tiago",
+    "cargo": "Gerente",
     "ativo": true,
     "pode_ver_funcionario": true,
     "pode_ver_imagens": true,

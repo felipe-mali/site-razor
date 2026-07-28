@@ -11,6 +11,19 @@ dois módulos e publica tudo em uma única porta:
 Os módulos continuam independentes, mas não é necessário configurar caminhos
 do computador, abrir duas portas publicamente ou copiar `node_modules`.
 
+## Estrutura em 30 segundos
+
+- `clientes/` contém o site público;
+- `funcionarios/` contém o painel interno e os dados persistentes;
+- `scripts/` contém instalação, testes, verificação e empacotamento;
+- `gateway.js` inicia os dois módulos em um único endereço;
+- `Dockerfile` e `compose.yaml` são usados somente na implantação com Docker.
+
+As pastas `node_modules/` e `dist/` não são código do projeto. Elas são geradas
+pelos comandos de instalação e empacotamento e, por isso, ficam fora do Git.
+Os arquivos `.env` também são locais; use os respectivos `.env.example` como
+modelo sem publicar configurações privadas.
+
 ## Requisitos
 
 - Node.js 20 ou superior;
