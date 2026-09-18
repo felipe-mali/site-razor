@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node test-dados-brasileiros.js && node test-cotacoes.js && node test-comprovante-entrega.js && node test-crm.js",
+    "test": "node test-dados-brasileiros.js && node test-cotacoes.js && node test-comprovante-entrega.js && node test-crm.js && node test-fila-producao.js && node test-feedback.js",
     "test:dados": "node test-dados-brasileiros.js",
     "test:comprovante": "node test-comprovante-entrega.js",
     "test:crm": "node test-crm.js",

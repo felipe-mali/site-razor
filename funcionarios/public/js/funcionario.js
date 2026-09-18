@@ -90,8 +90,8 @@ function aplicarPermissoesSidebar() {
   if (linkChaves && (cargo === 'admin' || user.pode_gerenciar_permissoes)) linkChaves.style.display = '';
 
   var telaAtual = localStorage.getItem('calc-tela-atual');
-  var telasVendedor = ['crm','cancelamentos','fotos','dashboard','producao','conversor','mureta','malha'];
-  var telasLogistica = ['fotos','cotacoes','comprovante-entrega','producao','conversor','mureta','malha'];
+  var telasVendedor = ['inicio','fila-producao','crm','cancelamentos','fotos','dashboard','producao','conversor','mureta','malha'];
+  var telasLogistica = ['inicio','fila-producao','fotos','cotacoes','comprovante-entrega','producao','conversor','mureta','malha'];
 
   if (cargo === 'vendedor' && telasVendedor.indexOf(telaAtual) === -1 &&
       !(telaAtual === 'cotacoes' && podeAcessarCotacoes) &&
@@ -152,6 +152,8 @@ function setVal(id, val) {
    ======================================== */
 
 function trocarTela(tela) {
+  document.body.classList.toggle('inicio-premium', tela === 'inicio');
+  document.getElementById('nav-inicio')?.classList.toggle('active', tela === 'inicio');
   document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
   document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('ativo'));
   document.querySelectorAll('.btn-menu').forEach(b => b.classList.remove('ativo'));
@@ -204,6 +206,8 @@ function trocarTela(tela) {
   }
 
   const mapa = {
+    inicio: 'tela-inicio',
+    'fila-producao': 'tela-fila-producao',
     producao:  'tela-producao',
     conversor: 'tela-conversor',
     mureta:    'tela-mureta',
@@ -216,6 +220,10 @@ function trocarTela(tela) {
     dashboard: 'tela-dashboard'
   };
 
+  if (tela === 'fila-producao') {
+    const frame = document.getElementById('fila-producao-frame');
+    if (frame && !frame.getAttribute('src')) frame.src = 'fila-producao/main.html';
+  }
   const id = mapa[tela];
   if (id) {
     document.getElementById(id)?.classList.add('ativa');
@@ -2183,9 +2191,8 @@ async function carregarEstado() {
     }
 
     // Restaurar tela salva
-    if (estado.telaAtual) {
-      localStorage.setItem('calc-tela-atual', estado.telaAtual);
-    }
+    // A navegação atual pertence a esta sessão; carregar os cálculos salvos
+    // não deve substituir a homepage nem uma tela que o usuário já abriu.
 
   } catch (e) {
     console.warn('Erro ao restaurar estado:', e);
@@ -2227,9 +2234,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (toolbar) toolbar.style.display = 'none';
   }
 
-  // Restaurar aba ativa
-  const telaSalva = localStorage.getItem('calc-tela-atual') || 'producao';
-  trocarTela(telaSalva);
+  // Cada entrada no painel começa pela homepage.
+  trocarTela('inicio');
 
   // 1. Carregar CSV em background (nao bloqueia a UI)
   carregarCSV().then(() => {

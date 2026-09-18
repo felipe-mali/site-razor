@@ -1,0 +1,41 @@
+{
+  "proximoId": 2,
+  "ordens": [],
+  "historico": [
+    {
+      "ordemId": 1,
+      "usuario": "felipe",
+      "acao": "criar",
+      "statusNovo": "aguardando",
+      "data": "2026-09-16T20:17:48.371Z"
+    },
+    {
+      "ordemId": 1,
+      "usuario": "felipe",
+      "acao": "excluir",
+      "data": "2026-09-18T14:00:20.971Z",
+      "ordem": {
+        "produto": "teste",
+        "medida": "12x2",
+        "cor": "",
+        "cliente": "aaaaa",
+        "observacoes": "testesteste",
+        "id": 1,
+        "numeroOP": "OP-000001",
+        "quantidade": 22,
+        "unidade": "m",
+        "prazo": "2444-12-31",
+        "prioridade": "urgente",
+        "solicitanteId": "felipe",
+        "solicitante": "Engenheiro Felipe",
+        "setorSolicitante": "engenheiro",
+        "status": "aguardando",
+        "versao": 1,
+        "dataSolicitacao": "2026-09-16T20:17:48.371Z",
+        "dataInicio": null,
+        "dataFinalizacao": null,
+        "responsavel": null
+      }
+    }
+  ]
+}

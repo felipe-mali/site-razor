@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <script src="../js/feedback.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Início · Controle de Produção</title>
+<link rel="stylesheet" href="style.css">
+<script src="modal.js" defer></script>
+<script src="api.js" defer></script>
+<script src="solicitante.js" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/razor-brand.css">
+  <link rel="stylesheet" href="premium.css">
+</head>
+<body class="razor-design">
+<a class="pular-conteudo" href="#conteudo">Ir para o conteúdo</a>
+<header class="cabecalho">
+<div class="perfil">
+<span>Usuário · Área do solicitante</span>
+<a href="../funcionario.html" target="_top">Painel ↗</a>
+</div>
+</header>
+<nav class="navegacao" aria-label="Principal">
+<div>
+<a href="main.html" aria-current="page">Início</a>
+<button type="button" data-abrir-solicitacao aria-haspopup="dialog" aria-controls="nova-solicitacao">Nova solicitação</button>
+<a href="#solicitacoes" >Solicitações</a>
+<a href="producao.html">Produção</a>
+</div>
+</nav>
+<main class="container" id="conteudo">
+<div class="titulo-pagina">
+<p class="sobretitulo">ÁREA DO SOLICITANTE</p>
+<h1>Controle de Produção</h1>
+<p>Solicite, acompanhe e consulte ordens de produção.</p>
+</div>
+<div class="acoes">
+<button type="button" class="botao" data-abrir-solicitacao aria-haspopup="dialog" aria-controls="nova-solicitacao">+ Nova solicitação</button>
+<a class="botao secundario" href="#solicitacoes">Ver solicitações →</a>
+</div>
+<p id="retorno-formulario" class="retorno" role="status" hidden></p>
+<section class="lista-solicitacoes" id="solicitacoes" aria-labelledby="titulo-lista">
+<div class="cabecalho-secao">
+<div>
+<h2 id="titulo-lista">Solicitações recentes</h2>
+<p>Acompanhe o andamento das ordens enviadas.</p>
+</div>
+<span id="contagem" class="legenda" role="status">
+</span>
+</div>
+<div class="filtros">
+<div class="campo busca">
+<label for="busca">Buscar solicitação</label>
+<input type="search" id="busca" placeholder="Buscar por OP, produto ou cliente...">
+</div>
+<div class="campo">
+<label for="filtro-status">Status</label>
+<select id="filtro-status">
+<option value="">Todos os status</option>
+<option value="aguardando">Aguardando</option>
+<option value="producao">Em produção</option>
+<option value="pausada">Pausada</option>
+<option value="concluida">Concluída</option>
+<option value="cancelada">Cancelada</option>
+</select>
+</div>
+<div class="campo">
+<label for="filtro-prioridade">Prioridade</label>
+<select id="filtro-prioridade">
+<option value="">Todas as prioridades</option>
+<option value="normal">Normal</option>
+<option value="urgente">Urgente</option>
+</select>
+</div>
+</div>
+<div class="tabela-container" tabindex="0" role="region" aria-label="Tabela de solicitações, role horizontalmente em telas menores">
+<table>
+<caption class="sr-only">Minhas ordens de produção</caption>
+<thead>
+<tr>
+<th scope="col">OP</th>
+<th scope="col">Produto</th>
+<th scope="col">Quantidade</th>
+<th scope="col">Solicitante</th>
+<th scope="col">Data</th>
+<th scope="col">Prazo</th>
+<th scope="col">Prioridade</th>
+<th scope="col">Status</th>
+<th scope="col" id="coluna-excluir" hidden>Ações</th>
+</tr>
+</thead>
+<tbody id="lista-ordens">
+</tbody>
+</table>
+</div>
+<noscript>
+<p>Ative o JavaScript para visualizar as ordens, filtrar e enviar o formulário.</p>
+</noscript>
+</section>
+<section class="guia" aria-labelledby="como-funciona">
+<div class="guia-intro">
+<p class="sobretitulo">DO PEDIDO À ENTREGA</p>
+<h2 id="como-funciona">Como funciona</h2>
+<p>Um fluxo simples para manter sua equipe e a produção na mesma página.</p>
+<div class="nota-guia">Comercial, Estoque e Administrativo utilizam o mesmo fluxo de solicitação.</div>
+</div>
+<ol class="etapas">
+<li>
+<span class="numero">01</span>
+<div class="etapa">
+<span class="icone-etapa" aria-hidden="true">＋</span>
+<div>
+<h3>Solicite a produção</h3>
+<p>Informe produto, quantidade, medidas, prazo e demais informações necessárias.</p>
+</div>
+</div>
+</li>
+<li>
+<span class="numero">02</span>
+<div class="etapa">
+<span class="icone-etapa" aria-hidden="true">≡</span>
+<div>
+<h3>Entrada na fila</h3>
+<p>Depois do envio, a solicitação entra na fila da equipe de produção.</p>
+</div>
+</div>
+</li>
+<li>
+<span class="numero">03</span>
+<div class="etapa">
+<span class="icone-etapa" aria-hidden="true">◷</span>
+<div>
+<h3>Acompanhe o andamento</h3>
+<p>Consulte se a ordem está aguardando, em produção, pausada ou concluída.</p>
+</div>
+</div>
+</li>
+<li>
+<span class="numero">04</span>
+<div class="etapa">
+<span class="icone-etapa" aria-hidden="true">✓</span>
+<div>
+<h3>Produção concluída</h3>
+<p>Quando a fabricação for finalizada, a informação será atualizada no sistema.</p>
+</div>
+</div>
+</li>
+</ol>
+</section>
+</main>
+<dialog class="painel modal-solicitacao" id="nova-solicitacao" aria-labelledby="titulo-formulario">
+<div class="cabecalho-secao">
+<div>
+<h2 id="titulo-formulario">Nova solicitação de produção</h2>
+<p>Informe os dados necessários para enviar a ordem à produção.</p>
+</div>
+<button type="button" class="botao secundario fechar-modal" data-fechar-modal aria-label="Fechar nova solicitação">×</button>
+</div>
+<p class="legenda legenda-formulario">* Campos obrigatórios</p>
+<form id="form-solicitacao" novalidate>
+<p id="erro-solicitacao" class="retorno erro-envio" role="alert" aria-live="assertive" hidden></p>
+<div class="grade-formulario">
+<div class="campo amplo">
+<label for="produto">Produto <span>*</span>
+</label>
+<input id="produto" name="produto" placeholder="Nome ou referência do produto" maxlength="160" required autofocus>
+</div>
+<div class="campo ">
+<label for="quantidade">Quantidade <span>*</span>
+</label>
+<input id="quantidade" name="quantidade" type="number" min="0.001" step="0.001" placeholder="Ex.: 100" required>
+</div>
+<div class="campo ">
+<label for="unidade">Unidade <span>*</span>
+</label>
+<select id="unidade" name="unidade" required>
+<option value="">Selecione</option>
+<option value="un">Unidade (un)</option>
+<option value="m">Metro (m)</option>
+<option value="m²">Metro quadrado (m²)</option>
+<option value="kg">Quilograma (kg)</option>
+<option value="pc">Peça (pc)</option>
+</select>
+</div>
+<div class="campo amplo">
+<label for="medida">Medida / Dimensão</label>
+<input id="medida" name="medida" placeholder="Ex.: 120 × 80 cm" maxlength="120">
+</div>
+<div class="campo ">
+<label for="cor">Cor</label>
+<input id="cor" name="cor" placeholder="Ex.: Preto fosco" maxlength="80">
+</div>
+<div class="campo ">
+<label for="prazo">Prazo desejado <span>*</span>
+</label>
+<input id="prazo" name="prazo" type="date" required>
+</div>
+<div class="campo amplo">
+<label for="cliente">Cliente</label>
+<input id="cliente" name="cliente" placeholder="Nome do cliente ou destino interno" maxlength="160">
+</div>
+<div class="campo amplo">
+<label for="prioridade">Prioridade <span>*</span>
+</label>
+<select id="prioridade" name="prioridade" required>
+<option value="normal">Normal</option>
+<option value="urgente">Urgente</option>
+</select>
+</div>
+<div class="campo linha-inteira">
+<label for="observacoes">Observações</label>
+<textarea id="observacoes" name="observacoes" rows="3" maxlength="2000" placeholder="Detalhes de fabricação, acabamento ou orientações adicionais">
+</textarea>
+</div>
+</div>
+<div class="rodape-formulario">
+<p>A ordem será enviada para a fila de produção.</p>
+<div class="acoes acoes-formulario">
+<button type="button" class="botao secundario" data-fechar-modal>Cancelar</button>
+<button type="submit" class="botao">Solicitar produção</button>
+</div>
+</div>
+</form>
+</dialog>
+
+<footer class="rodape">
+<span>Razor · Controle de Produção</span>
+<span>Ambiente de trabalho · Uso interno</span>
+</footer>
+</body>
+</html>

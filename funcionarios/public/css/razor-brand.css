@@ -1,0 +1,36 @@
+/* Identidade Razor — compartilhada pelo site público e pela área interna. */
+:root {
+  --rz-ink: #141917;
+  --rz-ground: #101512;
+  --rz-panel: #1a201c;
+  --rz-raised: #222923;
+  --rz-line: #343c33;
+  --rz-strong-line: #515c4e;
+  --rz-paper: #efede4;
+  --rz-muted: #acb4a5;
+  --rz-yellow: #efbc50;
+  --rz-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --rz-body: 'Barlow', 'Segoe UI', sans-serif;
+  --rz-mono: Consolas, 'Courier New', monospace;
+}
+@media screen {
+  body.razor-design {
+    --bg-primary: var(--rz-ground); --bg-secondary: var(--rz-ink); --bg-card: var(--rz-panel); --bg-steel: var(--rz-raised);
+    --accent: var(--rz-yellow); --accent-hover: #ffd279; --accent-border: #efbc5055;
+    --text-primary: var(--rz-paper); --text-secondary: #c6ccbe; --text-muted: var(--rz-muted);
+    --border: #c5d3b819; --border-hover: #c5d3b83d;
+    background: var(--rz-ground); color: var(--rz-paper); font-family: var(--rz-body); color-scheme: dark;
+  }
+  .razor-design ::selection { background: var(--rz-yellow); color: var(--rz-ink); }
+  .razor-design :where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--rz-yellow); outline-offset: 3px; }
+  .razor-design :where(input, select, textarea) { accent-color: var(--rz-yellow); }
+  .razor-design button { font-family: inherit; }
+  .rz-kicker { font: 500 10px/1.6 var(--rz-mono); letter-spacing: .12em; color: var(--rz-yellow); text-transform: uppercase; }
+  .rz-skip { position: fixed; top: -100px; left: 20px; z-index: 9999; padding: 12px 20px; background: var(--rz-yellow); color: var(--rz-ink); }
+  .rz-skip:focus { top: 12px; }
+  .razor-design :where(.btn, .botao) { border-radius: 2px; box-shadow: none; text-shadow: none; font-weight: 600; }
+  .razor-design :where(.btn, .botao):hover { transform: none; box-shadow: none; }
+  .razor-design :where(.btn, .botao)::before { display: none; }
+  .rz-brand-note { font: 10px/1.5 var(--rz-mono); letter-spacing: .12em; color: var(--rz-muted); }
+  @media (prefers-reduced-motion: reduce) { .razor-design *, .razor-design *::before, .razor-design *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+}

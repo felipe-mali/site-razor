@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <script src="js/feedback.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0A0A0A">
@@ -15,14 +16,16 @@
   <link rel="stylesheet" href="css/cotacoes.css">
   <link rel="stylesheet" href="css/comprovante-entrega.css">
   <link rel="stylesheet" href="css/admin-polish.css">
+  <link rel="stylesheet" href="css/inicio.css">
+  <link rel="stylesheet" href="css/razor-brand.css">
+  <link rel="stylesheet" href="css/razor-panel.css">
 </head>
-<body class="panel-page sidebar-page">
+<body class="panel-page sidebar-page inicio-premium razor-design">
   <header id="navbar">
     <div class="container">
       <a href="funcionario.html" class="nav-logo"><img src="fotos/logo.jpg" alt="Razor Industria" class="logo"></a>
       <nav>
-        <a href="funcionario.html">Inicio</a>
-        <a href="funcionario.html" class="active">Painel</a>
+        <a href="#inicio" id="nav-inicio" class="active" onclick="trocarTela('inicio'); return false;">Início</a>
         <a href="permissoes.html" id="link-permissoes" style="display:none">Permissoes</a>
         <a href="chaves-pagamento.html" id="link-chaves" style="display:none">Chaves</a>
         <a href="#" id="btn-sair" class="btn btn-ghost btn-sm">Sair</a>
@@ -39,6 +42,18 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
     <div class="sidebar-content">
+      <div class="sidebar-grupo">
+        <div class="sidebar-itens">
+          <button class="sidebar-btn ativo" id="menu-inicio" type="button" onclick="trocarTela('inicio')">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/></svg>
+            <span class="sidebar-label">Início</span>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-grupo">
+        <div class="sidebar-grupo-titulo"><span>Fila de produção</span></div>
+        <div class="sidebar-itens"><button class="sidebar-btn" id="menu-fila-producao" onclick="trocarTela('fila-producao')"><span class="sidebar-label">Fila de produção</span></button></div>
+      </div>
       <div class="sidebar-grupo" data-group="calculadoras">
         <div class="sidebar-grupo-titulo" onclick="toggleGrupo(this)">
           <span>Calculadoras</span>
@@ -136,7 +151,57 @@
 
   <!-- AREA PRINCIPAL -->
   <main class="main-content sidebar-main">    <!-- TELA 1 - PRODUCAO -->
-    <section id="tela-producao" class="tela ativa">
+    <section id="tela-inicio" class="tela ativa" aria-labelledby="inicio-titulo">
+      <div class="inicio-masthead"><p>RAZOR <span>/</span> AMBIENTE DE TRABALHO</p><time id="inicio-data"></time></div>
+      <div class="inicio-editorial">
+        <div class="inicio-editorial-texto">
+          <p class="inicio-saudacao" id="inicio-saudacao">Bem-vindo ao seu espaço de trabalho.</p>
+          <h2 id="inicio-titulo">Do pedido<br>à <em>produção.</em></h2>
+          <p class="inicio-introducao" id="inicio-fila-descricao">Cada etapa importa. Organize os pedidos, acompanhe a fabricação e faça o trabalho avançar.</p>
+          <button type="button" class="inicio-cta" onclick="trocarTela('fila-producao')"><span id="inicio-fila-acao">Abrir fila de produção</span><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          <div class="inicio-assinatura"><span class="inicio-perfil-label">SEU ACESSO</span><span id="inicio-cargo">Colaborador</span></div>
+        </div>
+        <figure class="inicio-prancha">
+          <div class="inicio-prancha-topo"><span>ENGENHARIA APLICADA</span><span aria-hidden="true">R / 01</span></div>
+          <img src="fotos/malha-tecnica.svg" width="520" height="480" alt="Ilustração técnica de uma tela metálica, com destaque para o entrelaçamento da malha." fetchpriority="high">
+          <figcaption><span>Telas &amp; alambrados</span><span>Precisão em cada detalhe.</span></figcaption>
+          <span class="inicio-prancha-selo" aria-hidden="true">MATÉRIA.<br>FORMA.<br>PROTEÇÃO.</span>
+        </figure>
+      </div>
+      <div class="inicio-faixa"><span>UM PROCESSO. TODA A EQUIPE.</span><ol aria-label="Etapas da produção"><li>Solicitar</li><li>Produzir</li><li>Concluir</li></ol><span class="inicio-faixa-marca" aria-hidden="true">///</span></div>
+      <div class="inicio-bancada">
+        <section class="inicio-ferramentas" aria-labelledby="inicio-atalhos-titulo" id="inicio-atalhos">
+          <div class="inicio-secao-titulo"><div><p class="inicio-eyebrow">01 — SEU ESPAÇO</p><h3 id="inicio-atalhos-titulo">A rotina, organizada.</h3></div><span class="inicio-indice">ÍNDICE DE FERRAMENTAS</span></div>
+          <div class="inicio-atalhos-grid">
+            <button type="button" class="inicio-atalho" data-home-menu="menu-crm" onclick="trocarTela('crm')" hidden><span class="inicio-atalho-texto"><strong>Clientes e CRM</strong><span>Contatos, cadastros e relacionamento.</span></span><span class="inicio-atalho-categoria">COMERCIAL</span><span class="inicio-seta" aria-hidden="true">↗</span></button>
+            <button type="button" class="inicio-atalho" data-home-menu="menu-cotacoes" onclick="trocarTela('cotacoes')" hidden><span class="inicio-atalho-texto"><strong>Cotação de preços</strong><span>Fornecedores, comparações e decisões.</span></span><span class="inicio-atalho-categoria">LOGÍSTICA</span><span class="inicio-seta" aria-hidden="true">↗</span></button>
+            <button type="button" class="inicio-atalho" data-home-menu="menu-comprovante-entrega" onclick="trocarTela('comprovante-entrega')" hidden><span class="inicio-atalho-texto"><strong>Comprovante de entrega</strong><span>Documentação para acompanhar o pedido.</span></span><span class="inicio-atalho-categoria">DOCUMENTOS</span><span class="inicio-seta" aria-hidden="true">↗</span></button>
+            <button type="button" class="inicio-atalho" data-home-menu="menu-fotos,menu-fotos-log" onclick="trocarTela('fotos')" hidden><span class="inicio-atalho-texto"><strong>Fotos e referências</strong><span>O arquivo visual da sua operação.</span></span><span class="inicio-atalho-categoria">ACERVO</span><span class="inicio-seta" aria-hidden="true">↗</span></button>
+            <button type="button" class="inicio-atalho" data-home-menu="menu-cancelamentos" onclick="trocarTela('cancelamentos')" hidden><span class="inicio-atalho-texto"><strong>Cancelamentos</strong><span>Histórico e motivos dos orçamentos cancelados.</span></span><span class="inicio-atalho-categoria">COMERCIAL</span><span class="inicio-seta" aria-hidden="true">↗</span></button>
+            <button type="button" class="inicio-atalho" data-home-menu="menu-dashboard" onclick="trocarTela('dashboard')" hidden><span class="inicio-atalho-texto"><strong>Dashboard</strong><span>Relatórios para acompanhar o negócio.</span></span><span class="inicio-atalho-categoria">INDICADORES</span><span class="inicio-seta" aria-hidden="true">↗</span></button>
+          </div>
+        </section>
+        <section class="inicio-calculadoras" aria-labelledby="inicio-calculadoras-titulo">
+          <div class="inicio-calculadoras-cabecalho"><p class="inicio-eyebrow">02 — BANCADA TÉCNICA</p><svg width="42" height="42" viewBox="0 0 42 42" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true"><rect x="5" y="5" width="32" height="32"/><path d="M5 21h32M21 5v32M10 13h6m-3-3v6m13-3h6M10 27l6 6m-6 0 6-6m10 1h6m-6 4h6"/></svg></div>
+          <h3 id="inicio-calculadoras-titulo">A medida<br><em>certa.</em></h3>
+          <p class="inicio-calculadoras-descricao">Do primeiro cálculo ao prazo final.<br>Ferramentas para trabalhar com precisão.</p>
+          <div class="inicio-calculadoras-links">
+            <button type="button" onclick="trocarTela('producao')">Prazo de produção <span aria-hidden="true">↗</span></button>
+            <button type="button" onclick="trocarTela('conversor')">Conversor de medidas <span aria-hidden="true">↗</span></button>
+            <button type="button" onclick="trocarTela('mureta')">Cálculo de mureta <span aria-hidden="true">↗</span></button>
+            <button type="button" onclick="trocarTela('malha')">Malha e bobina <span aria-hidden="true">↗</span></button>
+          </div>
+          <p class="inicio-calculadoras-unidades" aria-hidden="true">m <span>/</span> m² <span>/</span> kg</p>
+        </section>
+      </div>
+      <div class="inicio-admin" id="inicio-admin" hidden><span>GESTÃO DO AMBIENTE</span><a href="permissoes.html" id="inicio-permissoes" hidden>Usuários e permissões <span aria-hidden="true">↗</span></a><a href="chaves-pagamento.html" id="inicio-chaves" hidden>Chaves de pagamento <span aria-hidden="true">↗</span></a></div>
+      <div class="inicio-fecho"><p>Trabalho bem feito.<br><strong>De ponta a ponta.</strong></p><span>RAZOR INDÚSTRIA<br>RIBEIRÃO PRETO / SP</span></div>
+    </section>
+
+    <section id="tela-fila-producao" class="tela">
+      <iframe id="fila-producao-frame" title="Fila de produção — emissão e acompanhamento de ordens" style="width:100%;height:80vh;min-height:600px;border:0;border-radius:12px"></iframe>
+    </section>
+    <section id="tela-producao" class="tela">
       <div class="tela-titulo"><h2>Calculadora - Prazo de Producao</h2><p class="subtitulo">Estime horas, dias de fabricacao e previsao de entrega.</p></div>
       <div class="card-grid">
         <div class="card">
@@ -689,6 +754,7 @@
   <script src="js/comprovante-entrega-pdf.js"></script>
   <script src="js/comprovante-entrega.js"></script>
   <script src="js/funcionario.js"></script>
+  <script src="js/inicio.js"></script>
   <script src="js/cotacoes-print.js"></script>
   <script src="js/cotacoes.js?v=3"></script>
   <script src="js/cancelamentos.js"></script>

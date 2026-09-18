@@ -21,7 +21,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       localStorage.setItem('user', JSON.stringify(data.user));
       window.location.href = 'funcionario.html';
     } else {
-      errorMsg.textContent = 'Usuário ou senha inválidos';
+      errorMsg.textContent = data.error || 'Usuário ou senha inválidos';
     }
   } catch (err) {
     errorMsg.textContent = 'Erro ao conectar ao servidor';

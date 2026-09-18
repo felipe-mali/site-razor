@@ -19,6 +19,7 @@ document.getElementById('btn-sair').addEventListener('click', () => {
 
 // Labels dos cargos
 const CARGOS_LABELS = {
+  producao: 'Produção',
   admin: 'Administrador',
   engenheiro: 'Engenheiro',
   logistica: 'Logística',
@@ -124,10 +125,11 @@ function editarUsuario(id) {
 
 async function excluirUsuario(id) {
   if (!confirm('Excluir este usuário?')) return;
-  await fetch(`/api/usuarios/${id}`, {
+  const resposta = await fetch(`/api/usuarios/${id}`, {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${token}` }
   });
+  if (!resposta.ok) return;
   carregarUsuarios();
 }
 

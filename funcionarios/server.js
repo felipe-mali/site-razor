@@ -8,7 +8,7 @@ const DadosBrasileiros = require('./public/js/dados-brasileiros');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const HOST = String(process.env.HOST || '0.0.0.0').trim() || '0.0.0.0';
 
 function resolverCaminhoConfiguravel(valor, caminhoPadrao) {
@@ -256,6 +256,8 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/me', authenticate, (req, res) => {
   res.json(req.user);
 });
+
+require('./fila-producao')(app, { authenticate, DATA_PATH, lerJson, escreverJsonAtomico, usuarioAtual: usuario => lerJson(USUARIOS_PATH)[usuario] });
 
 // CRUD Usuários
 app.get('/api/usuarios', authenticate, requireAdmin, (req, res) => {
@@ -1173,6 +1175,18 @@ app.use((erro, req, res, next) => {
   });
 });
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`Sistema de funcionários iniciado em ${HOST}:${PORT}`);
+  const hostLocal = ['0.0.0.0', '::'].includes(HOST) ? 'localhost' : HOST;
+  console.log(`Login dos funcionários: http://${hostLocal}:${PORT}/login.html`);
+});
+
+server.on('error', erro => {
+  if (erro.code === 'EADDRINUSE') {
+    console.error(`A porta ${PORT} já está em uso. Encerre a instância anterior ou configure outra PORT no .env da pasta funcionarios.`);
+    console.error('O sistema de funcionários não foi iniciado nesta execução.');
+  } else {
+    console.error('Não foi possível iniciar o sistema de funcionários:', erro.message);
+  }
+  process.exitCode = 1;
 });

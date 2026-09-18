@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <script src="../js/feedback.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Produção · Controle de Produção</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="modal.js" defer></script>
+  <script src="api.js" defer></script>
+  <script src="producao.js" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/razor-brand.css">
+  <link rel="stylesheet" href="premium.css">
+</head>
+<body class="razor-design">
+<a class="pular-conteudo" href="#conteudo">Ir para o conteúdo</a>
+<header class="cabecalho">
+  <div class="perfil"><span>Usuário · Produção</span><a href="../funcionario.html" target="_top">Painel ↗</a></div>
+</header>
+<nav class="navegacao" aria-label="Principal"><div>
+  <a href="main.html">Início</a>
+  <a href="main.html#solicitacoes">Solicitações</a>
+  <a href="producao.html" aria-current="page">Produção</a>
+</div></nav>
+<main class="container" id="conteudo">
+  <div class="titulo-pagina">
+    <p class="sobretitulo">ÁREA DA PRODUÇÃO</p>
+    <h1>Fila de produção</h1>
+    <p>Receba as ordens, organize o trabalho e acompanhe cada etapa.</p>
+  </div>
+    <dl class="resumo-producao" aria-label="Visão geral de todas as ordens">
+    <div><dt>Aguardando</dt><dd id="total-aguardando">0</dd></div>
+    <div><dt>Em produção</dt><dd id="total-producao">0</dd></div>
+    <div><dt>Pausadas</dt><dd id="total-pausada">0</dd></div>
+    <div><dt>Urgentes em aberto</dt><dd id="total-urgentes">0</dd></div>
+    <div><dt>Atrasadas</dt><dd id="total-atrasadas">0</dd></div>
+    <div><dt>Concluídas</dt><dd id="total-concluida">0</dd></div>
+  </dl>
+  <section class="fila-producao" aria-labelledby="titulo-fila">
+    <div class="cabecalho-secao">
+      <div><h2 id="titulo-fila" tabindex="-1" data-foco-retorno>Ordens recebidas</h2><p>Ordens urgentes primeiro; em cada prioridade, as mais antigas.</p></div>
+      <span class="legenda" id="contagem-producao" role="status"></span>
+    </div>
+    <div class="filtros">
+      <div class="campo busca"><label for="busca-producao">Buscar ordem</label><input type="search" id="busca-producao" placeholder="Buscar OP, produto ou cliente..."></div>
+      <div class="campo"><label for="status-producao">Status</label><select id="status-producao">
+        <option value="nao-concluidas" selected>Não concluídas</option><option value="">Todos os status</option><option value="aguardando">Aguardando</option><option value="producao">Em produção</option><option value="pausada">Pausada</option><option value="concluida">Concluída</option><option value="cancelada">Cancelada</option>
+      </select></div>
+      <div class="campo"><label for="prioridade-producao">Prioridade</label><select id="prioridade-producao"><option value="">Todas as prioridades</option><option value="normal">Normal</option><option value="urgente">Urgente</option></select></div>
+    </div>
+    <p class="retorno retorno-producao" id="retorno-producao" role="status" hidden></p>
+    <div class="grade-ordens" id="ordens-producao"></div>
+    <p class="painel vazio" id="fila-vazia" hidden>Nenhuma ordem encontrada. Ajuste a busca ou os filtros.</p>
+    <noscript><p class="aviso-demo">Ative o JavaScript para visualizar a fila e testar as ações.</p></noscript>
+  </section>
+</main>
+<dialog class="painel modal-solicitacao" id="detalhes-ordem" aria-labelledby="titulo-detalhes">
+  <div class="cabecalho-secao"><div><p class="sobretitulo">DETALHES DA ORDEM</p><h2 id="titulo-detalhes" tabindex="-1" autofocus></h2></div><button type="button" class="botao secundario fechar-modal" data-fechar-modal aria-label="Fechar detalhes">×</button></div>
+  <dl class="dados-ordem" id="dados-ordem"></dl>
+  <div class="rodape-formulario"><p>Informações registradas no sistema.</p><button type="button" class="botao secundario" data-fechar-modal>Fechar</button></div>
+</dialog>
+<dialog class="painel modal-solicitacao modal-operacao" id="pausar-ordem" aria-labelledby="titulo-pausa" aria-describedby="descricao-pausa">
+  <div class="cabecalho-secao"><div><h2 id="titulo-pausa">Pausar produção</h2><p id="descricao-pausa"></p></div><button type="button" class="botao secundario fechar-modal" data-fechar-modal aria-label="Fechar pausa">×</button></div>
+  <form id="form-pausa">
+    <div class="campo"><label for="motivo-pausa">Motivo <span>*</span></label><select id="motivo-pausa" name="motivoPausa" required autofocus>
+      <option value="">Selecione o motivo</option><option>Falta de material</option><option>Manutenção</option><option>Ajuste de máquina</option><option>Prioridade alterada</option><option>Intervalo</option><option>Outro</option>
+    </select></div>
+    <div class="campo campo-observacao"><label for="observacao-pausa">Observação</label><textarea id="observacao-pausa" name="observacaoPausa" rows="3" maxlength="2000" placeholder="Detalhes para a equipe retomar o trabalho"></textarea></div>
+    <div class="rodape-formulario"><div class="acoes acoes-formulario"><button type="button" class="botao secundario" data-fechar-modal>Cancelar</button><button type="submit" class="botao">Pausar produção</button></div></div>
+  </form>
+</dialog>
+<dialog class="painel modal-solicitacao modal-operacao" id="finalizar-ordem" aria-labelledby="titulo-finalizacao" aria-describedby="descricao-finalizacao">
+  <div class="cabecalho-secao"><h2 id="titulo-finalizacao"></h2><button type="button" class="botao secundario fechar-modal" data-fechar-modal aria-label="Fechar confirmação">×</button></div>
+  <p id="descricao-finalizacao">Confirme que a quantidade solicitada foi produzida.</p>
+  <dl class="dados-ordem quantidade-finalizacao"><div><dt>Quantidade solicitada</dt><dd id="quantidade-finalizacao"></dd></div></dl>
+  <form id="form-finalizacao">
+    <div class="rodape-formulario"><div class="acoes acoes-formulario"><button type="button" class="botao secundario" data-fechar-modal autofocus>Cancelar</button><button type="submit" class="botao">Confirmar conclusão</button></div></div>
+  </form>
+</dialog>
+<footer class="rodape"><span>Razor · Controle de Produção</span><span>Ambiente de trabalho · Uso interno</span></footer>
+</body>
+</html>

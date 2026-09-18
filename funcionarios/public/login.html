@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <script src="js/feedback.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0A0A0A">
@@ -9,20 +10,33 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/premium.css">
+  <link rel="stylesheet" href="css/razor-brand.css">
+  <link rel="stylesheet" href="css/razor-panel.css">
 </head>
-<body class="login-page">
-  <div class="login-box">
-    <img src="fotos/logo.jpg" alt="Razor Indústria" class="logo">
-    <h1>Área do Colaborador</h1>
-    <form id="login-form">
-      <input type="text" id="usuario" placeholder="Usuário" required autocomplete="username">
-      <input type="password" id="senha" placeholder="Senha" required autocomplete="current-password">
-      <button type="submit" class="btn" style="width:100%;margin-top:4px">Entrar</button>
-      <p class="error-msg" id="error-msg"></p>
-    </form>
-    <a href="/site-clientes" class="voltar">← Voltar ao site de clientes</a>
-  </div>
+<body class="login-page razor-design">
+  <main class="rz-login">
+    <section class="rz-login-story" aria-labelledby="rz-login-title">
+      <a class="rz-login-brand" href="/site-clientes"><img src="fotos/logo.jpg" alt="Razor Indústria" width="140"></a>
+      <div class="rz-login-story-content"><p class="rz-kicker">AMBIENTE DE TRABALHO</p><h1 id="rz-login-title">Quem protege<br>também <em>constrói.</em></h1><p>Uma equipe. Cada etapa conectada.<br>Do primeiro pedido à entrega.</p></div>
+      <img src="fotos/malha-tecnica.svg" class="rz-login-mesh" width="520" height="480" alt="Ilustração técnica da malha de uma tela metálica.">
+      <div class="rz-login-signature"><span>RAZOR INDÚSTRIA</span><span>RIBEIRÃO PRETO / SP</span></div>
+    </section>
+    <section class="rz-login-access" aria-labelledby="rz-access-title">
+      <div class="login-box">
+        <p class="rz-kicker">ACESSO INTERNO / COLABORADORES</p>
+        <h2 id="rz-access-title">Bom ter<br>você aqui.</h2>
+        <p class="rz-login-intro">Entre com seu usuário para acessar as ferramentas da equipe.</p>
+        <form id="login-form">
+          <label for="usuario">Usuário</label><input type="text" id="usuario" placeholder="Seu usuário" required autocomplete="username" autocapitalize="none" spellcheck="false">
+          <label for="senha">Senha</label><input type="password" id="senha" placeholder="Sua senha" required autocomplete="current-password">
+          <button type="submit" class="btn">Entrar no painel <span aria-hidden="true">↗</span></button>
+          <p class="error-msg" id="error-msg" role="alert" aria-live="polite"></p>
+        </form>
+        <a href="/site-clientes" class="voltar">← Voltar ao site da Razor</a>
+        <p class="rz-login-help">Problemas de acesso? Fale com o administrador do sistema.</p>
+      </div>
+    </section>
+  </main>
   <script src="js/login.js"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@
   "felipe": {
     "senha": "Lim@020707",
     "nome": "Engenheiro Felipe",
-    "cargo": "engenheiro",
+    "cargo": "admin",
     "ativo": true,
     "pode_ver_funcionario": true,
     "pode_ver_imagens": true,
@@ -65,15 +65,15 @@
     "pode_gerenciar_permissoes": true,
     "pode_acessar_cotacoes": true
   },
-  "Tiago": {
-    "senha": "T1ago123",
-    "nome": "Tiago",
-    "cargo": "Gerente",
+  "teste": {
+    "senha": "teste",
+    "nome": "teste",
+    "cargo": "produção",
     "ativo": true,
     "pode_ver_funcionario": true,
-    "pode_ver_imagens": true,
-    "pode_editar_imagens": true,
-    "pode_gerenciar_permissoes": true,
+    "pode_ver_imagens": false,
+    "pode_editar_imagens": false,
+    "pode_gerenciar_permissoes": false,
     "pode_acessar_cotacoes": true
   }
 }

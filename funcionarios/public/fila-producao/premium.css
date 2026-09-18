@@ -1,0 +1,60 @@
+/* Fila de produção — mesma identidade dos módulos internos. */
+@media screen {
+  body.razor-design { --radius: 3px; font-family: var(--rz-body); background: #161815; }
+  .razor-design .cabecalho { min-height: 48px; padding-block: 12px; background: #20221f; border-bottom: 1px solid #494c46; }
+  .razor-design .perfil { width: 100%; justify-content: space-between; font-size: 11px; color: #c4c7c1; }
+  .razor-design .perfil a { font: 10px var(--rz-mono); padding-block: 5px; border: 0; color: var(--rz-yellow); }
+  .razor-design .navegacao { background: #1c1e1b; border-bottom: 1px solid #494c46; }
+  .razor-design .navegacao :where(a,button) { font-size: 11px; color: #c5c8c2; }
+  .razor-design .navegacao a[aria-current=page] { color: var(--rz-yellow); border-bottom-color: var(--rz-yellow); }
+  .razor-design .container { padding-top: 30px; max-width: 1380px; }
+  .razor-design .titulo-pagina { padding-bottom: 25px; border-bottom: 1px solid #4e524b; margin-bottom: 25px; }
+  .razor-design .sobretitulo { font: 9px/1.5 var(--rz-mono); letter-spacing: .1em; color: var(--rz-yellow); }
+  .razor-design h1 { font: 500 clamp(35px,4vw,52px)/1 var(--rz-display); letter-spacing: -.02em; }
+  .razor-design h2 { font: 500 27px/1.1 var(--rz-display); letter-spacing: -.01em; }
+  .razor-design .titulo-pagina h1 + p { font-size: 13px; color: #bbbeb7; }
+  .razor-design .botao { min-height: 43px; padding: 11px 18px; background: var(--rz-yellow); color: #272a25; font-size: 12px; border-radius: 2px; }
+  .razor-design .botao.secundario { background: transparent; color: #d8dbd5; border: 1px solid #73776f; }
+  .razor-design .botao:hover { background: #ffd37c; }.razor-design .botao.secundario:hover { background: #353833; }
+  .razor-design .filtros { padding: 20px; background: #20231f; border: 1px solid #4e534b; border-radius: 2px; gap: 18px; }
+  .razor-design label { color: #c9ccc5; font-size: 11px; }
+  .razor-design :where(input, select, textarea) { background: #171a16; border: 1px solid #62675e; border-radius: 2px; color: #f0f1ed; font-family: var(--rz-body); }
+  .razor-design :where(input,select,textarea):focus-visible { border-color: var(--rz-yellow); outline-color: var(--rz-yellow); }
+  .razor-design :where(input,textarea)::placeholder { color: #a8aca5; }
+  .razor-design .tabela-container { border: 1px solid #4e534b; border-radius: 2px; }
+  .razor-design th { background: #30332e; color: #d9dcd6; font: 9px var(--rz-mono); letter-spacing: .04em; padding: 16px; }
+  .razor-design td { background: #20231f; color: #d9dbd5; padding: 17px 16px; border-color: #42463f; }
+  .razor-design tbody tr:hover td { background: #2f332e; }
+  .razor-design .badge { border-radius: 2px; padding: 5px 8px; }
+  .razor-design .guia { border-color: #4f544c; gap: 35px; padding-top: 32px; }
+  .razor-design .etapa { border: 0; border-top: 1px solid #575c54; border-radius: 0; background: transparent; }
+  .razor-design .numero { border: 0; border-radius: 0; color: var(--rz-yellow); background: transparent; font: 400 28px var(--rz-display); }
+  .razor-design .etapas li::before { display: none; }
+  .razor-design .resumo-producao { gap: 1px; background: #595e55; border: 1px solid #595e55; }
+  .razor-design .resumo-producao > div { border: 0; border-radius: 0; background: #232622; padding: 18px; }
+  .razor-design .resumo-producao dt { color: #bcc0b8; font-size: 10px; }
+  .razor-design .resumo-producao dd { font: 500 40px var(--rz-display); color: var(--rz-paper); }
+  .razor-design .grade-ordens { gap: 18px; }
+  .razor-design .ordem-card { background: #252823; border: 1px solid #585d54; border-radius: 3px; padding: 23px; }
+  .razor-design .ordem-card.ordem-ativa { border-top: 3px solid #84b5da; }
+  .razor-design .ordem-card.ordem-urgente { border-left: 3px solid var(--rz-yellow); }
+  .razor-design .produto-ordem { font: 500 28px var(--rz-display); }
+  .razor-design .numero-op { color: var(--rz-yellow); font: 12px var(--rz-mono); }
+  .razor-design .dados-card dt, .razor-design .dados-ordem dt { color: #bec3b9; font-size: 10px; }
+  .razor-design .acoes-ordem { border-color: #52574e; }
+  .razor-design .painel { border-color: #71766b; border-radius: 3px; background: #282b26; }
+  .razor-design dialog.painel { background: #232622; border: 1px solid #8b9184; padding: 28px; box-shadow: 0 24px 80px #0009; }
+  .razor-design dialog::backdrop { background: #030702bb; }
+  .razor-design .rodape-formulario { border-color: #575c53; }
+  .razor-design .retorno { border-left-color: var(--rz-yellow); color: #e5e7e1; }
+  .razor-design .erro-envio { color: #ffdada; background: #321d1d; border-color: #e6a0a0; }
+  .razor-design .rodape { color: #b1b6ad; border-color: #52574e; font: 9px var(--rz-mono); letter-spacing: .03em; }
+  @media (max-width: 760px) { .razor-design .guia { grid-template-columns: 1fr; } }
+  @media (max-width: 580px) {
+    .razor-design .container { padding-inline: 16px; }.razor-design .filtros { padding: 15px; }
+    .razor-design :where(input,select,textarea) { font-size: 16px; }
+    .razor-design dialog.painel { padding: 20px; }
+    .razor-design .ordem-card { padding: 20px; }
+    .razor-design .resumo-producao > div { padding: 14px; }
+  }
+}
